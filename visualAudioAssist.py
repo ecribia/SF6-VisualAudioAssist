@@ -25,16 +25,14 @@ CONFIG_FILE = get_resource_path("config.json")
 CHECK_INTERVAL = 2
 COOLDOWN_PERIOD = 15
 CONTROL_SIMILARITY_THRESHOLD = 0.98
-RANK_SIMILARITY_THRESHOLD = 0.85
+# RANK_SIMILARITY_THRESHOLD = 0.85
 MIN_RANK_THRESHOLD = 0.70
 
-# Control type regions (left and right side of VS screen)
 CONTROL_REGIONS = [
     {"top": 834, "left": 56, "width": 35, "height": 31, "side": "left"},
     {"top": 835, "left": 1830, "width": 35, "height": 31, "side": "right"}
 ]
 
-# Rank regions (left and right side of VS screen)
 RANK_REGIONS = [
     {"top": 928, "left": 65, "width": 108, "height": 44, "side": "left"},
     {"top": 928, "left": 1740, "width": 108, "height": 44, "side": "right"}
@@ -43,11 +41,9 @@ RANK_REGIONS = [
 IS_WINDOWS = platform.system() == "Windows"
 IS_LINUX = platform.system() == "Linux"
 
-# Cache for the working capture method
 _capture_method = None
 _grim_path = None
 
-# Global flag for reconfiguration
 reconfigure_requested = False
 
 RANKS = [
@@ -199,7 +195,6 @@ def setup_wizard():
     print("VISUAL AUDIO ASSIST - SETUP")
     print("="*50 + "\n")
     
-    # Choose control type
     print("Select your control type:")
     for i, control in enumerate(CONTROLS, 1):
         print(f"  {i}. {control}")
@@ -217,7 +212,6 @@ def setup_wizard():
             print("\nSetup cancelled.")
             sys.exit(0)
     
-    # Choose rank
     print(f"\nYou selected: {player_control}")
     print("\nSelect your rank:")
     for i, rank in enumerate(RANKS, 1):
@@ -270,7 +264,6 @@ def play_audio_sequence(audio_files):
         try:
             mixer.music.load(str(audio_path))
             mixer.music.play()
-            # Wait for audio to finish
             while mixer.music.get_busy():
                 time.sleep(0.1)
         except Exception as e:
@@ -310,7 +303,6 @@ def main():
     print("VISUAL AUDIO ASSIST - Street Fighter 6 Rank Announcer")
     print("="*60 + "\n")
     
-    # Load or create configuration
     player_control, player_rank = load_config()
     
     if player_control and player_rank:
@@ -319,7 +311,6 @@ def main():
     else:
         player_control, player_rank = setup_wizard()
     
-    # Load all control images
     print("Loading control images...")
     control_images = {}
     try:
@@ -330,7 +321,6 @@ def main():
         print(f"Error loading control images: {e}")
         return
     
-    # Load all rank images
     print("Loading rank images...")
     rank_images = {}
     try:
@@ -345,11 +335,10 @@ def main():
     print(f"Check interval: {CHECK_INTERVAL} seconds")
     print(f"Audio cooldown: {COOLDOWN_PERIOD} seconds")
     print(f"Control threshold: {CONTROL_SIMILARITY_THRESHOLD * 100}%")
-    print(f"Rank threshold: {RANK_SIMILARITY_THRESHOLD * 100}%")
+    # print(f"Rank threshold: {RANK_SIMILARITY_THRESHOLD * 100}%")
     print("Press Ctrl+C to stop")
     print("Press 'R' to reconfigure\n")
     
-    # Start keyboard listener thread
     listener_thread = threading.Thread(target=keyboard_listener, daemon=True)
     listener_thread.start()
     
@@ -357,7 +346,6 @@ def main():
     
     try:
         while True:
-            # Check for reconfiguration request
             if reconfigure_requested:
                 reconfigure_requested = False
                 print("\n" + "="*60)
@@ -367,9 +355,8 @@ def main():
                 print("\nResuming monitoring...\n")
                 continue
             
-            # Step 1: Check LEFT side first
-            left_region = CONTROL_REGIONS[0]  # Left side
-            right_region = CONTROL_REGIONS[1]  # Right side
+            left_region = CONTROL_REGIONS[0] 
+            right_region = CONTROL_REGIONS[1]
             
             left_control = None
             left_similarity = 0
@@ -388,7 +375,6 @@ def main():
             except Exception as e:
                 print(f"Error checking left control region: {e}")
             
-            # Step 2: If left side has match, check RIGHT side
             if left_control:
                 right_control = None
                 right_similarity = 0
@@ -407,7 +393,6 @@ def main():
                 except Exception as e:
                     print(f"Error checking right control region: {e}")
                 
-                # Step 3: VS Screen detected - determine opponent
                 print(f"\n{'='*60}")
                 print(f"VS SCREEN DETECTED")
                 print(f"  Left: {left_control} ({left_similarity * 100:.1f}%)")
@@ -421,12 +406,10 @@ def main():
                 
                 if current_time - last_audio_time >= COOLDOWN_PERIOD:
                     try:
-                        # Determine opponent side and control
                         opponent_side = None
                         opponent_control = None
                         
                         if right_control:
-                            # Both sides detected
                             if left_control != player_control and right_control == player_control:
                                 opponent_side = "left"
                                 opponent_control = left_control
@@ -436,26 +419,21 @@ def main():
                                 opponent_control = right_control
                                 print(f"\nOpponent identified: {opponent_control} on RIGHT side")
                             elif left_control == player_control and right_control == player_control:
-                                # Both same as player - determine by rank later
                                 opponent_control = player_control
                                 print(f"\nBoth players use {player_control} - will determine opponent by rank")
                             else:
-                                # Both different from player (shouldn't happen)
                                 opponent_side = "left"
                                 opponent_control = left_control
                                 print(f"\nWarning: Unexpected control combination, assuming left is opponent")
                         else:
-                            # Only left side detected
                             if left_control != player_control:
                                 opponent_side = "left"
                                 opponent_control = left_control
                                 print(f"\nOnly left side detected: {opponent_control}")
                             else:
-                                # Only player's control on left, opponent must be on right (but not detected)
                                 opponent_control = player_control
                                 print(f"\nOnly your control detected on left - opponent on right (undetected)")
                         
-                        # Capture both rank regions
                         print("\nCapturing rank regions...")
                         rank_captures = {}
                         
@@ -467,22 +445,18 @@ def main():
                                 print(f"Error capturing {region['side']} rank: {e}")
                         
                         if len(rank_captures) == 2:
-                            # Find best match for both ranks
                             left_rank, left_sim = find_best_rank_match(rank_captures["left"], rank_images)
                             right_rank, right_sim = find_best_rank_match(rank_captures["right"], rank_images)
                             
                             print(f"Left rank: {left_rank} ({left_sim * 100:.1f}%)")
                             print(f"Right rank: {right_rank} ({right_sim * 100:.1f}%)")
                             
-                            # Determine opponent's rank
                             opponent_rank = None
                             
                             if opponent_side:
-                                # We already know which side is opponent
                                 opponent_rank = left_rank if opponent_side == "left" else right_rank
                                 print(f"Opponent rank (based on side): {opponent_rank}")
                             else:
-                                # Same control type - determine by rank
                                 if left_rank == player_rank and right_rank == player_rank:
                                     opponent_rank = player_rank
                                     print(f"Both ranks are {player_rank} - opponent has same rank")
@@ -493,10 +467,7 @@ def main():
                                     opponent_rank = left_rank
                                     print(f"Your rank on right ({player_rank}), opponent on left: {opponent_rank}")
                                 else:
-                                    # Neither matches player rank
-                                    # Default to left if we detected left control, otherwise right
                                     if opponent_side is None:
-                                        # Fallback: pick the higher confidence rank
                                         if left_sim >= right_sim:
                                             opponent_rank = left_rank
                                             print(f"Warning: Your rank ({player_rank}) not detected. Using left rank: {opponent_rank}")
@@ -507,7 +478,6 @@ def main():
                                         opponent_rank = left_rank if opponent_side == "left" else right_rank
                                         print(f"Warning: Your rank ({player_rank}) not detected. Using {opponent_side} rank: {opponent_rank}")
                             
-                            # Play audio sequence
                             if opponent_control and opponent_rank and opponent_rank != "Unknown":
                                 audio_files = [f"{opponent_control}.mp3", f"{opponent_rank}.mp3"]
                                 print(f"\nPlaying audio sequence: {' -> '.join(audio_files)}")
