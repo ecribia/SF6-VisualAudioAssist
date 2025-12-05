@@ -60,7 +60,7 @@ RANKS = [
     "GrandMaster", "UltimateMaster", "Legend"
 ]
 
-CONTROLS = ["Modern", "Classic"]
+CONTROLS = ["Classic", "Modern"]
 
 def load_image(image_name):
     """Load an image from the media folder"""
@@ -309,10 +309,15 @@ def keyboard_listener():
             try:
                 tty.setcbreak(sys.stdin.fileno())
                 while True:
+                    # Only check for 'r' key, don't consume other input
                     if select.select([sys.stdin], [], [], 0.1)[0]:
                         key = sys.stdin.read(1).lower()
                         if key == 'r':
                             reconfigure_requested = True
+                            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+                            while reconfigure_requested:
+                                time.sleep(0.5)
+                            tty.setcbreak(sys.stdin.fileno())
                     time.sleep(0.1)
             finally:
                 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
