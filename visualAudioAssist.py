@@ -42,7 +42,6 @@ CHECK_INTERVAL = 2
 COOLDOWN_PERIOD = 15
 CONTROL_SIMILARITY_THRESHOLD = 0.98
 MIN_RANK_THRESHOLD = 0.70
-NAME_SIMILARITY_THRESHOLD = 0.96
 
 CONTROL_REGIONS = [
     {"top": 834, "left": 56, "width": 35, "height": 31, "side": "left"},
@@ -634,17 +633,15 @@ def main():
                                 
                                 print(f"Name similarity - Left: {left_name_sim * 100:.1f}% | Right: {right_name_sim * 100:.1f}%")
                                 
-                                if left_name_sim >= NAME_SIMILARITY_THRESHOLD and right_name_sim < NAME_SIMILARITY_THRESHOLD:
+                                # Use whichever side has the higher match
+                                if left_name_sim > right_name_sim:
                                     opponent_side = "right"
                                     opponent_control = right_control if right_control else left_control
                                     print(f"✓ Player detected on LEFT, opponent on RIGHT")
-                                elif right_name_sim >= NAME_SIMILARITY_THRESHOLD and left_name_sim < NAME_SIMILARITY_THRESHOLD:
+                                else:
                                     opponent_side = "left"
                                     opponent_control = left_control
                                     print(f"✓ Player detected on RIGHT, opponent on LEFT")
-                                else:
-                                    print(f"⚠ Name detection inconclusive, using fallback method")
-                                    opponent_side = None
                             except Exception as e:
                                 print(f"Error in name detection: {e}")
                                 print("Falling back to control matching...")
