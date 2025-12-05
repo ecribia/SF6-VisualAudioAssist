@@ -42,7 +42,7 @@ CHECK_INTERVAL = 2
 COOLDOWN_PERIOD = 15
 CONTROL_SIMILARITY_THRESHOLD = 0.98
 MIN_RANK_THRESHOLD = 0.70
-NAME_SIMILARITY_THRESHOLD = 0.85
+NAME_SIMILARITY_THRESHOLD = 0.99
 
 CONTROL_REGIONS = [
     {"top": 834, "left": 56, "width": 35, "height": 31, "side": "left"},
@@ -261,21 +261,10 @@ def name_capture_wizard(control_images):
     print("\nInstructions:")
     print("1. Open a replay in Street Fighter 6")
     print("2. Make sure YOU are on the LEFT side of the screen")
-    print("3. Go to the VS screen (character select)")
-    print("\nPress Enter when ready, or 'q' to skip...")
+    print("3. Your name will be registered from the VS screen")
+    print("\nWaiting for VS screen detection...\n")
     
-    try:
-        user_input = input().strip().lower()
-        if user_input == 'q':
-            print("Skipping name capture.")
-            return False
-    except (KeyboardInterrupt, EOFError):
-        print("\nCapture cancelled.")
-        return False
-    
-    print("\nWaiting for VS screen detection...")
-    print("(Monitoring for Modern/Classic controls...)\n")
-    
+    # Monitor until VS screen is detected
     while True:
         try:
             left_region = CONTROL_REGIONS[0]
@@ -285,10 +274,11 @@ def name_capture_wizard(control_images):
                 similarity = compare_images(screen_img, control_img)
                 
                 if similarity >= CONTROL_SIMILARITY_THRESHOLD:
-                    print(f"VS screen detected! (Control: {control_name})")
+                    print("VS screen detected!")
                     print("Capturing player name from left side...")
                     
-                    name_region = NAME_REGIONS[0]
+                    # Capture the left name region
+                    name_region = NAME_REGIONS[0]  # Left side
                     name_img = capture_region(name_region)
                     
                     if save_player_name_image(name_img):
@@ -504,9 +494,11 @@ def main():
         print(f"Error loading control images: {e}")
         return
     
+    # Initial setup
     if player_control and player_rank:
         print(f"Loaded configuration: {player_control} / {player_rank}")
         
+        # Check if name detection is enabled but MyName.png is missing
         if use_name_detection:
             player_name_img = load_player_name_image()
             if player_name_img is None:
@@ -533,6 +525,7 @@ def main():
         print(f"Error loading rank images: {e}")
         return
     
+    # Load player name image if available
     player_name_img = load_player_name_image() if use_name_detection else None
     
     print(f"Monitoring VS screen on {platform.system()}...")
@@ -629,6 +622,7 @@ def main():
                         opponent_side = None
                         opponent_control = None
                         
+                        # First, try name detection if available
                         if player_name_img is not None:
                             print("\nUsing name detection...")
                             try:
@@ -655,6 +649,7 @@ def main():
                                 print(f"Error in name detection: {e}")
                                 print("Falling back to control matching...")
                         
+                        # Fallback to control matching if name detection didn't work
                         if opponent_side is None:
                             if right_control:
                                 if left_control != player_control and right_control == player_control:
