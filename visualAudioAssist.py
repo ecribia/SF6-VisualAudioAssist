@@ -300,27 +300,30 @@ def keyboard_listener():
                         pass
                 time.sleep(0.1)
         else:
+            # For Linux/Wayland - use a simpler approach that doesn't interfere with input()
             import sys
-            import tty
-            import termios
             import select
             
-            old_settings = termios.tcgetattr(sys.stdin)
-            try:
-                tty.setcbreak(sys.stdin.fileno())
-                while True:
-                    # Only check for 'r' key, don't consume other input
-                    if select.select([sys.stdin], [], [], 0.1)[0]:
-                        key = sys.stdin.read(1).lower()
-                        if key == 'r':
-                            reconfigure_requested = True
-                            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-                            while reconfigure_requested:
-                                time.sleep(0.5)
+            while True:
+                # Only check if stdin has data available, but don't read in cbreak mode
+                # This way input() can still work normally
+                try:
+                    if not reconfigure_requested and select.select([sys.stdin], [], [], 0.1)[0]:
+                        # Check if we can read without blocking
+                        import termios
+                        import tty
+                        
+                        old_settings = termios.tcgetattr(sys.stdin)
+                        try:
                             tty.setcbreak(sys.stdin.fileno())
-                    time.sleep(0.1)
-            finally:
-                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+                            key = sys.stdin.read(1).lower()
+                            if key == 'r':
+                                reconfigure_requested = True
+                        finally:
+                            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+                except:
+                    pass
+                time.sleep(0.2)
     except Exception as e:
         print(f"Keyboard listener error: {e}")
 
