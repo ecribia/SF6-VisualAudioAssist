@@ -27,7 +27,7 @@ def get_exe_directory():
         return Path(__file__).parent
 
 MEDIA_FOLDER = get_resource_path("media")
-CHECK_INTERVAL = 2
+CHECK_INTERVAL = 1
 COOLDOWN_PERIOD = 15
 CONTROL_SIMILARITY_THRESHOLD = 0.98
 MIN_RANK_THRESHOLD = 0.70
@@ -238,7 +238,6 @@ def name_capture_wizard(control_images):
     print("of the screen for accurate opponent detection.")
     play_audio("wizard_instructions.mp3")
     
-    # Capture LEFT side
     print("\n" + "-"*60)
     print("STEP 1: LEFT SIDE CAPTURE")
     print("-"*60)
@@ -257,20 +256,29 @@ def name_capture_wizard(control_images):
                 
                 if similarity >= CONTROL_SIMILARITY_THRESHOLD:
                     print("VS screen detected!")
-                    print("Capturing player name from left side...")
+                    print("Waiting 1 second to avoid screen blink...")
+                    time.sleep(1)
                     
-                    name_region = NAME_REGIONS[0]
-                    name_img = capture_region(name_region)
+                    screen_img = capture_region(left_region)
+                    similarity = compare_images(screen_img, control_img)
                     
-                    if save_player_name_image(name_img, "left"):
-                        print("✓ Left side name captured successfully!\n")
-                        play_audio("wizard_left_success.mp3")
-                        left_captured = True
-                        break
+                    if similarity >= CONTROL_SIMILARITY_THRESHOLD:
+                        print("VS screen still present. Capturing player name from left side...")
+                        
+                        name_region = NAME_REGIONS[0]
+                        name_img = capture_region(name_region)
+                        
+                        if save_player_name_image(name_img, "left"):
+                            print("✓ Left side name captured successfully!\n")
+                            play_audio("wizard_left_success.mp3")
+                            left_captured = True
+                            break
+                        else:
+                            print("✗ Failed to save left side image.\n")
+                            play_audio("wizard_error.mp3")
+                            return False
                     else:
-                        print("✗ Failed to save left side image.\n")
-                        play_audio("wizard_error.mp3")
-                        return False
+                        print("VS screen disappeared, retrying...\n")
                         
         except Exception as e:
             print(f"Error during left side capture: {e}")
@@ -280,7 +288,6 @@ def name_capture_wizard(control_images):
         if not left_captured:
             time.sleep(1)
     
-    # Capture RIGHT side
     print("\n" + "-"*60)
     print("STEP 2: RIGHT SIDE CAPTURE")
     print("-"*60)
@@ -298,23 +305,32 @@ def name_capture_wizard(control_images):
                 
                 if similarity >= CONTROL_SIMILARITY_THRESHOLD:
                     print("VS screen detected!")
-                    print("Capturing player name from right side...")
+                    print("Waiting 1 second to avoid screen blink...")
+                    time.sleep(1)
                     
-                    name_region = NAME_REGIONS[1]
-                    name_img = capture_region(name_region)
+                    screen_img = capture_region(right_region)
+                    similarity = compare_images(screen_img, control_img)
                     
-                    if save_player_name_image(name_img, "right"):
-                        print("✓ Right side name captured successfully!\n")
-                        play_audio("wizard_right_success.mp3")
-                        print("="*60)
-                        print("SETUP COMPLETE")
-                        print("="*60)
-                        play_audio("wizard_complete.mp3")
-                        return True
+                    if similarity >= CONTROL_SIMILARITY_THRESHOLD:
+                        print("VS screen still present. Capturing player name from right side...")
+                        
+                        name_region = NAME_REGIONS[1]
+                        name_img = capture_region(name_region)
+                        
+                        if save_player_name_image(name_img, "right"):
+                            print("✓ Right side name captured successfully!\n")
+                            play_audio("wizard_right_success.mp3")
+                            print("="*60)
+                            print("SETUP COMPLETE")
+                            print("="*60)
+                            play_audio("wizard_complete.mp3")
+                            return True
+                        else:
+                            print("✗ Failed to save right side image.\n")
+                            play_audio("wizard_error.mp3")
+                            return False
                     else:
-                        print("✗ Failed to save right side image.\n")
-                        play_audio("wizard_error.mp3")
-                        return False
+                        print("VS screen disappeared, retrying...\n")
                         
         except Exception as e:
             print(f"Error during right side capture: {e}")
@@ -373,14 +389,12 @@ def main():
         print(f"Error loading control images: {e}")
         return
     
-    # Check for player name images
     player_name_left, player_name_right = load_player_name_images()
     
     if player_name_left is None or player_name_right is None:
         if not name_capture_wizard(control_images):
             print("Setup failed. Exiting.")
             return
-        # Reload after wizard
         player_name_left, player_name_right = load_player_name_images()
     else:
         print("Player name images found: MyNameLeft.png, MyNameRight.png")
@@ -457,22 +471,42 @@ def main():
                 
                 if current_time - last_audio_time >= COOLDOWN_PERIOD:
                     try:
+                        print("Waiting 1 second to avoid screen blink...")
+                        time.sleep(1)
+                        
+                        try:
+                            left_screen_img = capture_region(left_region)
+                            left_still_present = False
+                            for control_name, control_img in control_images.items():
+                                similarity = compare_images(left_screen_img, control_img)
+                                if similarity >= CONTROL_SIMILARITY_THRESHOLD:
+                                    left_still_present = True
+                                    break
+                            
+                            if not left_still_present:
+                                print("VS screen disappeared during wait, skipping...")
+                                print(f"{'='*60}\n")
+                                time.sleep(CHECK_INTERVAL)
+                                continue
+                                
+                        except Exception as e:
+                            print(f"Error re-verifying left control region: {e}")
+                            time.sleep(CHECK_INTERVAL)
+                            continue
+                        
                         opponent_side = None
                         opponent_control = None
                         
-                        # Use name detection to determine sides
                         print("\nUsing name detection...")
                         try:
                             left_name_img = capture_region(NAME_REGIONS[0])
                             right_name_img = capture_region(NAME_REGIONS[1])
                             
-                            # Compare with both stored images
                             left_vs_left = compare_images(player_name_left, left_name_img)
                             left_vs_right = compare_images(player_name_left, right_name_img)
                             right_vs_left = compare_images(player_name_right, left_name_img)
                             right_vs_right = compare_images(player_name_right, right_name_img)
                             
-                            # Determine which side the player is on
                             left_side_max = max(left_vs_left, right_vs_left)
                             right_side_max = max(left_vs_right, right_vs_right)
                             
