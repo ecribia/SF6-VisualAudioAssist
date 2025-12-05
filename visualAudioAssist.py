@@ -5,7 +5,6 @@ import platform
 import sys
 import glob
 import os
-import json
 from pathlib import Path
 from pygame import mixer
 import threading
@@ -19,16 +18,6 @@ def get_resource_path(relative_path):
     except Exception:
         base_path = Path(__file__).parent
     return base_path / relative_path
-
-def get_config_path():
-    """ Get config path in user's home directory for persistent storage """
-    if IS_WINDOWS:
-        config_dir = Path(os.getenv('APPDATA')) / 'VisualAudioAssist'
-    else:
-        config_dir = Path.home() / '.config' / 'VisualAudioAssist'
-    
-    config_dir.mkdir(parents=True, exist_ok=True)
-    return config_dir / 'config.json'
 
 def get_exe_directory():
     """ Get the directory where the executable is located """
@@ -64,7 +53,7 @@ IS_LINUX = platform.system() == "Linux"
 _capture_method = None
 _grim_path = None
 
-reconfigure_requested = False
+
 
 RANKS = [
     "NewChallenger", "Rookie", "Iron", "Bronze", "Silver", "Gold", 
@@ -97,19 +86,22 @@ def load_image_from_path(image_path):
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
     return img
 
-def load_player_name_image():
-    """Load player name image from exe directory if it exists"""
+def load_player_name_images():
+    """Load player name images from exe directory if they exist"""
     exe_dir = get_exe_directory()
-    player_name_path = exe_dir / "MyName.png"
+    left_path = exe_dir / "MyNameLeft.png"
+    right_path = exe_dir / "MyNameRight.png"
     
-    if player_name_path.exists():
-        return load_image_from_path(player_name_path)
-    return None
+    left_img = load_image_from_path(left_path) if left_path.exists() else None
+    right_img = load_image_from_path(right_path) if right_path.exists() else None
+    
+    return left_img, right_img
 
-def save_player_name_image(img):
+def save_player_name_image(img, side):
     """Save player name image to exe directory"""
     exe_dir = get_exe_directory()
-    player_name_path = exe_dir / "MyName.png"
+    filename = f"MyName{side.capitalize()}.png"
+    player_name_path = exe_dir / filename
     try:
         cv2.imwrite(str(player_name_path), img)
         print(f"Player name image saved to: {player_name_path}")
@@ -117,6 +109,20 @@ def save_player_name_image(img):
     except Exception as e:
         print(f"Error saving player name image: {e}")
         return False
+
+def play_audio(audio_file):
+    """Play a single audio file"""
+    audio_path = MEDIA_FOLDER / audio_file
+    if not audio_path.exists():
+        print(f"Audio file not found: {audio_file}")
+        return
+    try:
+        mixer.music.load(str(audio_path))
+        mixer.music.play()
+        while mixer.music.get_busy():
+            time.sleep(0.1)
+    except Exception as e:
+        print(f"Error playing audio {audio_file}: {e}")
 
 def capture_region_windows(region):
     import mss
@@ -220,50 +226,25 @@ def compare_images(img1, img2):
     similarity = 1 - (mse / max_mse)
     return similarity
 
-def load_config():
-    """Load player configuration from config.json"""
-    config_file = get_config_path()
-    if config_file.exists():
-        try:
-            with open(config_file, 'r') as f:
-                config = json.load(f)
-                return (
-                    config.get("player_control"), 
-                    config.get("player_rank"),
-                    config.get("use_name_detection", False)
-                )
-        except Exception as e:
-            print(f"Error loading config: {e}")
-    return None, None, False
-
-def save_config(control, rank, use_name_detection):
-    """Save player configuration to config.json"""
-    try:
-        config_file = get_config_path()
-        config = {
-            "player_control": control, 
-            "player_rank": rank,
-            "use_name_detection": use_name_detection
-        }
-        with open(config_file, 'w') as f:
-            json.dump(config, f, indent=2)
-        print(f"Configuration saved to: {config_file}\n")
-    except Exception as e:
-        print(f"Error saving config: {e}")
-
 def name_capture_wizard(control_images):
-    """Guide user through capturing their player name"""
+    """Guide user through capturing their player name from both sides"""
     print("\n" + "="*60)
     print("PLAYER NAME CAPTURE WIZARD")
     print("="*60)
-    print("\nThis will improve opponent detection accuracy.")
-    print("\nInstructions:")
-    print("1. Open a replay in Street Fighter 6")
-    print("2. Make sure YOU are on the LEFT side of the screen")
-    print("3. Your name will be registered from the VS screen")
-    print("\nWaiting for VS screen detection...\n")
+    print("\nNo player name images detected. Running image capture wizard.")
+    play_audio("wizard_start.mp3")
     
-    # Monitor until VS screen is detected
+    print("\nThis wizard will capture your player name from both sides")
+    print("of the screen for accurate opponent detection.")
+    play_audio("wizard_instructions.mp3")
+    
+    print("\n" + "-"*60)
+    print("STEP 1: LEFT SIDE CAPTURE")
+    print("-"*60)
+    print("Open a replay where you start on the LEFT side of the screen.")
+    print("Your name will be registered from the VS screen.\n")
+    play_audio("wizard_left_step.mp3")
+    
     while True:
         try:
             left_region = CONTROL_REGIONS[0]
@@ -276,133 +257,65 @@ def name_capture_wizard(control_images):
                     print("VS screen detected!")
                     print("Capturing player name from left side...")
                     
-                    # Capture the left name region
-                    name_region = NAME_REGIONS[0]  # Left side
+                    name_region = NAME_REGIONS[0]
                     name_img = capture_region(name_region)
                     
-                    if save_player_name_image(name_img):
-                        print("✓ Player name captured successfully!\n")
-                        return True
+                    if save_player_name_image(name_img, "left"):
+                        print("✓ Left side name captured successfully!\n")
+                        play_audio("wizard_left_success.mp3")
+                        break
                     else:
-                        print("✗ Failed to save player name image.\n")
+                        print("✗ Failed to save left side image.\n")
+                        play_audio("wizard_error.mp3")
                         return False
                         
         except Exception as e:
-            print(f"Error during capture: {e}")
+            print(f"Error during left side capture: {e}")
+            play_audio("wizard_error.mp3")
             return False
         
         time.sleep(1)
-
-def setup_name_detection(control_images):
-    """Ask user if they want to set up name detection"""
-    player_name_img = load_player_name_image()
     
-    if player_name_img is not None:
-        print("Player name image found: MyName.png")
-        return True
-    
-    print("\n" + "="*60)
-    print("PLAYER NAME DETECTION SETUP")
-    print("="*60)
-    print("\nMyName.png not found in the executable directory.")
-    print("\nName detection improves opponent identification accuracy.")
-    print("Without it, the program will use control/rank matching (less accurate).")
+    print("\n" + "-"*60)
+    print("STEP 2: RIGHT SIDE CAPTURE")
+    print("-"*60)
+    print("Now open a replay where you start on the RIGHT side of the screen.\n")
+    play_audio("wizard_right_step.mp3")
     
     while True:
         try:
-            choice = input("\nDo you want to set up player name detection? (y/n): ").strip().lower()
-            if choice == 'y':
-                if name_capture_wizard(control_images):
-                    return True
-                else:
-                    print("\nCapture failed. Will use fallback detection method.")
-                    return False
-            elif choice == 'n':
-                print("\nUsing fallback detection method (control/rank matching).")
-                return False
-            else:
-                print("Please enter 'y' or 'n'.")
-        except (KeyboardInterrupt, EOFError):
-            print("\nSetup cancelled. Using fallback detection method.")
+            right_region = CONTROL_REGIONS[1]
+            screen_img = capture_region(right_region)
+            
+            for control_name, control_img in control_images.items():
+                similarity = compare_images(screen_img, control_img)
+                
+                if similarity >= CONTROL_SIMILARITY_THRESHOLD:
+                    print("VS screen detected!")
+                    print("Capturing player name from right side...")
+                    
+                    name_region = NAME_REGIONS[1]
+                    name_img = capture_region(name_region)
+                    
+                    if save_player_name_image(name_img, "right"):
+                        print("✓ Right side name captured successfully!\n")
+                        play_audio("wizard_right_success.mp3")
+                        print("="*60)
+                        print("SETUP COMPLETE")
+                        print("="*60)
+                        play_audio("wizard_complete.mp3")
+                        return True
+                    else:
+                        print("✗ Failed to save right side image.\n")
+                        play_audio("wizard_error.mp3")
+                        return False
+                        
+        except Exception as e:
+            print(f"Error during right side capture: {e}")
+            play_audio("wizard_error.mp3")
             return False
-
-def setup_wizard():
-    """Interactive setup to choose player control and rank"""
-    print("\n" + "="*50)
-    print("VISUAL AUDIO ASSIST - SETUP")
-    print("="*50 + "\n")
-    
-    print("Select your control type:")
-    for i, control in enumerate(CONTROLS, 1):
-        print(f"  {i}. {control}")
-    
-    while True:
-        try:
-            choice = input("\nEnter number (1-2): ").strip()
-            choice_num = int(choice)
-            if 1 <= choice_num <= len(CONTROLS):
-                player_control = CONTROLS[choice_num - 1]
-                break
-            else:
-                print("Invalid choice. Please enter 1 or 2.")
-        except ValueError:
-            print("Invalid input. Please enter a number.")
-        except (KeyboardInterrupt, EOFError):
-            print("\nSetup cancelled.")
-            sys.exit(0)
-    
-    print(f"\nYou selected: {player_control}")
-    print("\nSelect your rank:")
-    for i, rank in enumerate(RANKS, 1):
-        print(f"  {i:2d}. {rank}")
-    
-    while True:
-        try:
-            choice = input(f"\nEnter number (1-{len(RANKS)}): ").strip()
-            choice_num = int(choice)
-            if 1 <= choice_num <= len(RANKS):
-                player_rank = RANKS[choice_num - 1]
-                break
-            else:
-                print(f"Invalid choice. Please enter a number between 1 and {len(RANKS)}.")
-        except ValueError:
-            print("Invalid input. Please enter a number.")
-        except (KeyboardInterrupt, EOFError):
-            print("\nSetup cancelled.")
-            sys.exit(0)
-    
-    print(f"\nYou selected: {player_rank}")
-    print("\n" + "="*50)
-    print(f"Configuration: {player_control} / {player_rank}")
-    print("="*50 + "\n")
-    
-    return player_control, player_rank
-
-def reconfigure_menu(control_images):
-    """Show reconfiguration menu"""
-    print("\n" + "="*50)
-    print("RECONFIGURATION MENU")
-    print("="*50)
-    print("\n1. Reconfigure control type")
-    print("2. Reconfigure rank")
-    print("3. Set up player name detection")
-    print("4. Cancel")
-    
-    while True:
-        try:
-            choice = input("\nEnter number (1-4): ").strip()
-            if choice == '1' or choice == '2':
-                return 'full_setup'
-            elif choice == '3':
-                return 'name_setup'
-            elif choice == '4':
-                print("\nCancelled. Resuming monitoring...")
-                return 'cancel'
-            else:
-                print("Invalid choice. Please enter 1-4.")
-        except (KeyboardInterrupt, EOFError):
-            print("\nCancelled. Resuming monitoring...")
-            return 'cancel'
+        
+        time.sleep(1)
 
 def find_best_rank_match(captured_img, rank_images):
     """Find the best matching rank from all rank images"""
@@ -435,53 +348,13 @@ def play_audio_sequence(audio_files):
         except Exception as e:
             print(f"Error playing audio {audio_file}: {e}")
 
-def keyboard_listener():
-    """Listen for keyboard input in a separate thread"""
-    global reconfigure_requested
-    try:
-        if IS_WINDOWS:
-            import msvcrt
-            while True:
-                if msvcrt.kbhit():
-                    key = msvcrt.getch()
-                    try:
-                        key_str = key.decode('utf-8').lower()
-                        if key_str == 'r':
-                            reconfigure_requested = True
-                    except:
-                        pass
-                time.sleep(0.1)
-        else:
-            import sys
-            import tty
-            import termios
-            import select
-            
-            while True:
-                try:
-                    if not reconfigure_requested and select.select([sys.stdin], [], [], 0.1)[0]:
-                        old_settings = termios.tcgetattr(sys.stdin)
-                        try:
-                            tty.setcbreak(sys.stdin.fileno())
-                            key = sys.stdin.read(1).lower()
-                            if key == 'r':
-                                reconfigure_requested = True
-                        finally:
-                            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-                except:
-                    pass
-                time.sleep(0.2)
-    except Exception as e:
-        print(f"Keyboard listener error: {e}")
+
 
 def main():
-    global reconfigure_requested
     
     print("\n" + "="*60)
     print("VISUAL AUDIO ASSIST - Street Fighter 6 Rank Announcer")
     print("="*60 + "\n")
-    
-    player_control, player_rank, use_name_detection = load_config()
     
     print("Loading control images...")
     control_images = {}
@@ -493,28 +366,17 @@ def main():
         print(f"Error loading control images: {e}")
         return
     
-    # Initial setup
-    if player_control and player_rank:
-        print(f"Loaded configuration: {player_control} / {player_rank}")
-        
-        # Check if name detection is enabled but MyName.png is missing
-        if use_name_detection:
-            player_name_img = load_player_name_image()
-            if player_name_img is None:
-                print("\nWarning: Name detection enabled but MyName.png not found!")
-                if setup_name_detection(control_images):
-                    use_name_detection = True
-                else:
-                    use_name_detection = False
-                save_config(player_control, player_rank, use_name_detection)
-        
-        print("Press 'R' during monitoring to reconfigure\n")
-    else:
-        player_control, player_rank = setup_wizard()
-        use_name_detection = setup_name_detection(control_images)
-        save_config(player_control, player_rank, use_name_detection)
+    player_name_left, player_name_right = load_player_name_images()
     
-    print("Loading rank images...")
+    if player_name_left is None or player_name_right is None:
+        if not name_capture_wizard(control_images):
+            print("Setup failed. Exiting.")
+            return
+        player_name_left, player_name_right = load_player_name_images()
+    else:
+        print("Player name images found: MyNameLeft.png, MyNameRight.png")
+    
+    print("\nLoading rank images...")
     rank_images = {}
     try:
         for rank in RANKS:
@@ -524,48 +386,16 @@ def main():
         print(f"Error loading rank images: {e}")
         return
     
-    # Load player name image if available
-    player_name_img = load_player_name_image() if use_name_detection else None
-    
     print(f"Monitoring VS screen on {platform.system()}...")
     print(f"Check interval: {CHECK_INTERVAL} seconds")
     print(f"Audio cooldown: {COOLDOWN_PERIOD} seconds")
     print(f"Control threshold: {CONTROL_SIMILARITY_THRESHOLD * 100}%")
-    if player_name_img is not None:
-        print(f"Name detection: ENABLED")
-    else:
-        print(f"Name detection: DISABLED (using fallback)")
-    print("Press Ctrl+C to stop")
-    print("Press 'R' to reconfigure\n")
-    
-    listener_thread = threading.Thread(target=keyboard_listener, daemon=True)
-    listener_thread.start()
+    print("Press Ctrl+C to stop\n")
     
     last_audio_time = 0
     
     try:
         while True:
-            if reconfigure_requested:
-                reconfigure_requested = False
-                print("\n" + "="*60)
-                print("RECONFIGURATION REQUESTED")
-                print("="*60)
-                
-                menu_choice = reconfigure_menu(control_images)
-                
-                if menu_choice == 'full_setup':
-                    player_control, player_rank = setup_wizard()
-                    save_config(player_control, player_rank, use_name_detection)
-                    print("\nResuming monitoring...")
-                elif menu_choice == 'name_setup':
-                    use_name_detection = setup_name_detection(control_images)
-                    player_name_img = load_player_name_image() if use_name_detection else None
-                    save_config(player_control, player_rank, use_name_detection)
-                    print("\nResuming monitoring...")
-                
-                print("Press 'R' to reconfigure again\n")
-                continue
-            
             left_region = CONTROL_REGIONS[0] 
             right_region = CONTROL_REGIONS[1]
             
@@ -612,7 +442,7 @@ def main():
                 else:
                     print(f"  Right: No match detected")
                 print(f"{'='*60}")
-                print("Press 'R' to reconfigure | Ctrl+C to stop")
+                print("Ctrl+C to stop")
                 
                 current_time = time.time()
                 
@@ -621,57 +451,33 @@ def main():
                         opponent_side = None
                         opponent_control = None
                         
-                        # First, try name detection if available
-                        if player_name_img is not None:
-                            print("\nUsing name detection...")
-                            try:
-                                left_name_img = capture_region(NAME_REGIONS[0])
-                                right_name_img = capture_region(NAME_REGIONS[1])
-                                
-                                left_name_sim = compare_images(player_name_img, left_name_img)
-                                right_name_sim = compare_images(player_name_img, right_name_img)
-                                
-                                print(f"Name similarity - Left: {left_name_sim * 100:.1f}% | Right: {right_name_sim * 100:.1f}%")
-                                
-                                # Use whichever side has the higher match
-                                if left_name_sim > right_name_sim:
-                                    opponent_side = "right"
-                                    opponent_control = right_control if right_control else left_control
-                                    print(f"✓ Player detected on LEFT, opponent on RIGHT")
-                                else:
-                                    opponent_side = "left"
-                                    opponent_control = left_control
-                                    print(f"✓ Player detected on RIGHT, opponent on LEFT")
-                            except Exception as e:
-                                print(f"Error in name detection: {e}")
-                                print("Falling back to control matching...")
-                        
-                        # Fallback to control matching if name detection didn't work
-                        if opponent_side is None:
-                            if right_control:
-                                if left_control != player_control and right_control == player_control:
-                                    opponent_side = "left"
-                                    opponent_control = left_control
-                                    print(f"\nOpponent identified: {opponent_control} on LEFT side")
-                                elif right_control != player_control and left_control == player_control:
-                                    opponent_side = "right"
-                                    opponent_control = right_control
-                                    print(f"\nOpponent identified: {opponent_control} on RIGHT side")
-                                elif left_control == player_control and right_control == player_control:
-                                    opponent_control = player_control
-                                    print(f"\nBoth players use {player_control} - will determine opponent by rank")
-                                else:
-                                    opponent_side = "left"
-                                    opponent_control = left_control
-                                    print(f"\nWarning: Unexpected control combination, assuming left is opponent")
+                        print("\nUsing name detection...")
+                        try:
+                            left_name_img = capture_region(NAME_REGIONS[0])
+                            right_name_img = capture_region(NAME_REGIONS[1])
+                            
+                            left_vs_left = compare_images(player_name_left, left_name_img)
+                            left_vs_right = compare_images(player_name_left, right_name_img)
+                            right_vs_left = compare_images(player_name_right, left_name_img)
+                            right_vs_right = compare_images(player_name_right, right_name_img)
+                            
+                            left_side_max = max(left_vs_left, right_vs_left)
+                            right_side_max = max(left_vs_right, right_vs_right)
+                            
+                            print(f"Name similarity - Left side: {left_side_max * 100:.1f}% | Right side: {right_side_max * 100:.1f}%")
+                            
+                            if left_side_max > right_side_max:
+                                opponent_side = "right"
+                                opponent_control = right_control if right_control else left_control
+                                print(f"✓ Player detected on LEFT, opponent on RIGHT")
                             else:
-                                if left_control != player_control:
-                                    opponent_side = "left"
-                                    opponent_control = left_control
-                                    print(f"\nOnly left side detected: {opponent_control}")
-                                else:
-                                    opponent_control = player_control
-                                    print(f"\nOnly your control detected on left - opponent on right (undetected)")
+                                opponent_side = "left"
+                                opponent_control = left_control
+                                print(f"✓ Player detected on RIGHT, opponent on LEFT")
+                                
+                        except Exception as e:
+                            print(f"Error in name detection: {e}")
+                            continue
                         
                         print("\nCapturing rank regions...")
                         rank_captures = {}
@@ -690,32 +496,8 @@ def main():
                             print(f"Left rank: {left_rank} ({left_sim * 100:.1f}%)")
                             print(f"Right rank: {right_rank} ({right_sim * 100:.1f}%)")
                             
-                            opponent_rank = None
-                            
-                            if opponent_side:
-                                opponent_rank = left_rank if opponent_side == "left" else right_rank
-                                print(f"Opponent rank (based on side): {opponent_rank}")
-                            else:
-                                if left_rank == player_rank and right_rank == player_rank:
-                                    opponent_rank = player_rank
-                                    print(f"Both ranks are {player_rank} - opponent has same rank")
-                                elif left_rank == player_rank:
-                                    opponent_rank = right_rank
-                                    print(f"Your rank on left ({player_rank}), opponent on right: {opponent_rank}")
-                                elif right_rank == player_rank:
-                                    opponent_rank = left_rank
-                                    print(f"Your rank on right ({player_rank}), opponent on left: {opponent_rank}")
-                                else:
-                                    if opponent_side is None:
-                                        if left_sim >= right_sim:
-                                            opponent_rank = left_rank
-                                            print(f"Warning: Your rank ({player_rank}) not detected. Using left rank: {opponent_rank}")
-                                        else:
-                                            opponent_rank = right_rank
-                                            print(f"Warning: Your rank ({player_rank}) not detected. Using right rank: {opponent_rank}")
-                                    else:
-                                        opponent_rank = left_rank if opponent_side == "left" else right_rank
-                                        print(f"Warning: Your rank ({player_rank}) not detected. Using {opponent_side} rank: {opponent_rank}")
+                            opponent_rank = left_rank if opponent_side == "left" else right_rank
+                            print(f"Opponent rank: {opponent_rank}")
                             
                             if opponent_control and opponent_rank and opponent_rank != "Unknown":
                                 audio_files = [f"{opponent_control}.mp3", f"{opponent_rank}.mp3"]
@@ -746,7 +528,6 @@ def main():
     
     except KeyboardInterrupt:
         print("\n\nMonitoring stopped.")
-        print("Configuration saved. Run again to resume with same settings.")
 
 if __name__ == "__main__":
     main()
