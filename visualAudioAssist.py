@@ -232,18 +232,18 @@ def name_capture_wizard(control_images):
     print("PLAYER NAME CAPTURE WIZARD")
     print("="*60)
     print("\nNo player name images detected. Running image capture wizard.")
-    play_audio("wizard_start.mp3")
+    play_audio("wizard_start.ogg")
     
     print("\nThis wizard will capture your player name from both sides")
     print("of the screen for accurate opponent detection.")
-    play_audio("wizard_instructions.mp3")
+    play_audio("wizard_instructions.ogg")
     
     print("\n" + "-"*60)
     print("STEP 1: LEFT SIDE CAPTURE")
     print("-"*60)
     print("Open a replay where you start on the LEFT side of the screen.")
     print("Your name will be registered from the VS screen.\n")
-    play_audio("wizard_left_step.mp3")
+    play_audio("wizard_left_step.ogg")
     
     left_captured = False
     while not left_captured:
@@ -270,19 +270,19 @@ def name_capture_wizard(control_images):
                         
                         if save_player_name_image(name_img, "left"):
                             print("✓ Left side name captured successfully!\n")
-                            play_audio("wizard_left_success.mp3")
+                            play_audio("wizard_left_success.ogg")
                             left_captured = True
                             break
                         else:
                             print("✗ Failed to save left side image.\n")
-                            play_audio("wizard_error.mp3")
+                            play_audio("wizard_error.ogg")
                             return False
                     else:
                         print("VS screen disappeared, retrying...\n")
                         
         except Exception as e:
             print(f"Error during left side capture: {e}")
-            play_audio("wizard_error.mp3")
+            play_audio("wizard_error.ogg")
             return False
         
         if not left_captured:
@@ -292,7 +292,7 @@ def name_capture_wizard(control_images):
     print("STEP 2: RIGHT SIDE CAPTURE")
     print("-"*60)
     print("Now open a replay where you start on the RIGHT side of the screen.\n")
-    play_audio("wizard_right_step.mp3")
+    play_audio("wizard_right_step.ogg")
     
     right_captured = False
     while not right_captured:
@@ -319,22 +319,22 @@ def name_capture_wizard(control_images):
                         
                         if save_player_name_image(name_img, "right"):
                             print("✓ Right side name captured successfully!\n")
-                            play_audio("wizard_right_success.mp3")
+                            play_audio("wizard_right_success.ogg")
                             print("="*60)
                             print("SETUP COMPLETE")
                             print("="*60)
-                            play_audio("wizard_complete.mp3")
+                            play_audio("wizard_complete.ogg")
                             return True
                         else:
                             print("✗ Failed to save right side image.\n")
-                            play_audio("wizard_error.mp3")
+                            play_audio("wizard_error.ogg")
                             return False
                     else:
                         print("VS screen disappeared, retrying...\n")
                         
         except Exception as e:
             print(f"Error during right side capture: {e}")
-            play_audio("wizard_error.mp3")
+            play_audio("wizard_error.ogg")
             return False
         
         if not right_captured:
@@ -546,7 +546,7 @@ def main():
                             print(f"Opponent rank: {opponent_rank}")
                             
                             if opponent_control and opponent_rank and opponent_rank != "Unknown":
-                                audio_files = [f"{opponent_control}.mp3", f"{opponent_rank}.mp3"]
+                                audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}.ogg"]
                                 print(f"\nPlaying audio sequence: {' -> '.join(audio_files)}")
                                 play_audio_sequence(audio_files)
                                 last_audio_time = current_time
