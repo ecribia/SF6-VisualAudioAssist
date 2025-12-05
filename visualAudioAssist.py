@@ -238,6 +238,7 @@ def name_capture_wizard(control_images):
     print("of the screen for accurate opponent detection.")
     play_audio("wizard_instructions.mp3")
     
+    # Capture LEFT side
     print("\n" + "-"*60)
     print("STEP 1: LEFT SIDE CAPTURE")
     print("-"*60)
@@ -245,7 +246,8 @@ def name_capture_wizard(control_images):
     print("Your name will be registered from the VS screen.\n")
     play_audio("wizard_left_step.mp3")
     
-    while True:
+    left_captured = False
+    while not left_captured:
         try:
             left_region = CONTROL_REGIONS[0]
             screen_img = capture_region(left_region)
@@ -263,6 +265,7 @@ def name_capture_wizard(control_images):
                     if save_player_name_image(name_img, "left"):
                         print("✓ Left side name captured successfully!\n")
                         play_audio("wizard_left_success.mp3")
+                        left_captured = True
                         break
                     else:
                         print("✗ Failed to save left side image.\n")
@@ -274,15 +277,18 @@ def name_capture_wizard(control_images):
             play_audio("wizard_error.mp3")
             return False
         
-        time.sleep(1)
+        if not left_captured:
+            time.sleep(1)
     
+    # Capture RIGHT side
     print("\n" + "-"*60)
     print("STEP 2: RIGHT SIDE CAPTURE")
     print("-"*60)
     print("Now open a replay where you start on the RIGHT side of the screen.\n")
     play_audio("wizard_right_step.mp3")
     
-    while True:
+    right_captured = False
+    while not right_captured:
         try:
             right_region = CONTROL_REGIONS[1]
             screen_img = capture_region(right_region)
@@ -315,7 +321,8 @@ def name_capture_wizard(control_images):
             play_audio("wizard_error.mp3")
             return False
         
-        time.sleep(1)
+        if not right_captured:
+            time.sleep(1)
 
 def find_best_rank_match(captured_img, rank_images):
     """Find the best matching rank from all rank images"""
@@ -366,12 +373,14 @@ def main():
         print(f"Error loading control images: {e}")
         return
     
+    # Check for player name images
     player_name_left, player_name_right = load_player_name_images()
     
     if player_name_left is None or player_name_right is None:
         if not name_capture_wizard(control_images):
             print("Setup failed. Exiting.")
             return
+        # Reload after wizard
         player_name_left, player_name_right = load_player_name_images()
     else:
         print("Player name images found: MyNameLeft.png, MyNameRight.png")
@@ -451,16 +460,19 @@ def main():
                         opponent_side = None
                         opponent_control = None
                         
+                        # Use name detection to determine sides
                         print("\nUsing name detection...")
                         try:
                             left_name_img = capture_region(NAME_REGIONS[0])
                             right_name_img = capture_region(NAME_REGIONS[1])
                             
+                            # Compare with both stored images
                             left_vs_left = compare_images(player_name_left, left_name_img)
                             left_vs_right = compare_images(player_name_left, right_name_img)
                             right_vs_left = compare_images(player_name_right, left_name_img)
                             right_vs_right = compare_images(player_name_right, right_name_img)
                             
+                            # Determine which side the player is on
                             left_side_max = max(left_vs_left, right_vs_left)
                             right_side_max = max(left_vs_right, right_vs_right)
                             
