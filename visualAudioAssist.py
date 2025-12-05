@@ -20,12 +20,20 @@ def get_resource_path(relative_path):
         base_path = Path(__file__).parent
     return base_path / relative_path
 
+def get_config_path():
+    """ Get config path in user's home directory for persistent storage """
+    if IS_WINDOWS:
+        config_dir = Path(os.getenv('APPDATA')) / 'VisualAudioAssist'
+    else:
+        config_dir = Path.home() / '.config' / 'VisualAudioAssist'
+    
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir / 'config.json'
+
 MEDIA_FOLDER = get_resource_path("media")
-CONFIG_FILE = get_resource_path("config.json")
 CHECK_INTERVAL = 2
 COOLDOWN_PERIOD = 15
 CONTROL_SIMILARITY_THRESHOLD = 0.98
-# RANK_SIMILARITY_THRESHOLD = 0.85
 MIN_RANK_THRESHOLD = 0.70
 
 CONTROL_REGIONS = [
@@ -49,7 +57,7 @@ reconfigure_requested = False
 RANKS = [
     "NewChallenger", "Rookie", "Iron", "Bronze", "Silver", "Gold", 
     "Platinum", "Diamond", "Master", "HighMaster", 
-    "GrandMaster", "UltimateMaster"
+    "GrandMaster", "UltimateMaster", "Legend"
 ]
 
 CONTROLS = ["Modern", "Classic"]
@@ -170,9 +178,10 @@ def compare_images(img1, img2):
 
 def load_config():
     """Load player configuration from config.json"""
-    if CONFIG_FILE.exists():
+    config_file = get_config_path()
+    if config_file.exists():
         try:
-            with open(CONFIG_FILE, 'r') as f:
+            with open(config_file, 'r') as f:
                 config = json.load(f)
                 return config.get("player_control"), config.get("player_rank")
         except Exception as e:
@@ -182,10 +191,11 @@ def load_config():
 def save_config(control, rank):
     """Save player configuration to config.json"""
     try:
+        config_file = get_config_path()
         config = {"player_control": control, "player_rank": rank}
-        with open(CONFIG_FILE, 'w') as f:
+        with open(config_file, 'w') as f:
             json.dump(config, f, indent=2)
-        print(f"Configuration saved!\n")
+        print(f"Configuration saved to: {config_file}\n")
     except Exception as e:
         print(f"Error saving config: {e}")
 
@@ -208,7 +218,9 @@ def setup_wizard():
                 break
             else:
                 print("Invalid choice. Please enter 1 or 2.")
-        except (ValueError, KeyboardInterrupt):
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+        except (KeyboardInterrupt, EOFError):
             print("\nSetup cancelled.")
             sys.exit(0)
     
@@ -226,7 +238,9 @@ def setup_wizard():
                 break
             else:
                 print(f"Invalid choice. Please enter a number between 1 and {len(RANKS)}.")
-        except (ValueError, KeyboardInterrupt):
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+        except (KeyboardInterrupt, EOFError):
             print("\nSetup cancelled.")
             sys.exit(0)
     
@@ -277,24 +291,33 @@ def keyboard_listener():
             import msvcrt
             while True:
                 if msvcrt.kbhit():
-                    key = msvcrt.getch().decode('utf-8').lower()
-                    if key == 'r':
-                        reconfigure_requested = True
+                    key = msvcrt.getch()
+                    try:
+                        key_str = key.decode('utf-8').lower()
+                        if key_str == 'r':
+                            reconfigure_requested = True
+                    except:
+                        pass
+                time.sleep(0.1)
         else:
             import sys
             import tty
             import termios
+            import select
+            
             old_settings = termios.tcgetattr(sys.stdin)
             try:
                 tty.setcbreak(sys.stdin.fileno())
                 while True:
-                    key = sys.stdin.read(1).lower()
-                    if key == 'r':
-                        reconfigure_requested = True
+                    if select.select([sys.stdin], [], [], 0.1)[0]:
+                        key = sys.stdin.read(1).lower()
+                        if key == 'r':
+                            reconfigure_requested = True
+                    time.sleep(0.1)
             finally:
                 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Keyboard listener error: {e}")
 
 def main():
     global reconfigure_requested
@@ -335,7 +358,6 @@ def main():
     print(f"Check interval: {CHECK_INTERVAL} seconds")
     print(f"Audio cooldown: {COOLDOWN_PERIOD} seconds")
     print(f"Control threshold: {CONTROL_SIMILARITY_THRESHOLD * 100}%")
-    # print(f"Rank threshold: {RANK_SIMILARITY_THRESHOLD * 100}%")
     print("Press Ctrl+C to stop")
     print("Press 'R' to reconfigure\n")
     
@@ -352,7 +374,8 @@ def main():
                 print("RECONFIGURATION REQUESTED")
                 print("="*60)
                 player_control, player_rank = setup_wizard()
-                print("\nResuming monitoring...\n")
+                print("\nResuming monitoring...")
+                print("Press 'R' to reconfigure again\n")
                 continue
             
             left_region = CONTROL_REGIONS[0] 
@@ -401,6 +424,7 @@ def main():
                 else:
                     print(f"  Right: No match detected")
                 print(f"{'='*60}")
+                print("Press 'R' to reconfigure | Ctrl+C to stop")
                 
                 current_time = time.time()
                 
