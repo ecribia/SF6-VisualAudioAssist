@@ -26,17 +26,19 @@ def get_exe_directory():
     else:
         return Path(__file__).parent
 
+ENABLE_HEALTH_MONITORING = True
+
 MEDIA_FOLDER = get_resource_path("media")
 CHECK_INTERVAL = 1
 COOLDOWN_PERIOD = 15
 CONTROL_SIMILARITY_THRESHOLD = 0.98
 MIN_RANK_THRESHOLD = 0.70
 MIN_DIVISION_THRESHOLD = 0.70
-HEALTH_SIMILARITY_THRESHOLD = 0.95
+HEALTH_SIMILARITY_THRESHOLD = 0.995
 MATCH_CHECK_INTERVAL = 2
 HEALTH_CHECK_INTERVAL = 1
-HEALTH_CONFIRMATION_CHECKS = 2  # Require 2 consecutive yellow detections
-HEALTH_CONFIRMATION_DELAY = 0.2  # Wait 0.3s between confirmation checks
+HEALTH_CONFIRMATION_CHECKS = 2
+HEALTH_CONFIRMATION_DELAY = 0.2
 
 CONTROL_REGIONS = [
     {"top": 834, "left": 56, "width": 35, "height": 31, "side": "left"},
@@ -59,8 +61,8 @@ DIVISION_REGIONS = [
 ]
 
 HEALTH_REGIONS = [
-    {"top": 65, "left": 820, "width": 24, "height": 31, "side": "left"},   # P1 (red)
-    {"top": 65, "left": 1076, "width": 24, "height": 31, "side": "right"}  # P2 (blue)
+    {"top": 65, "left": 820, "width": 24, "height": 31, "side": "left"},
+    {"top": 65, "left": 1076, "width": 24, "height": 31, "side": "right"}
 ]
 
 IS_WINDOWS = platform.system() == "Windows"
@@ -81,7 +83,6 @@ DIVISIONS = ["One", "Two", "Three", "Four", "Five"]
 
 CONTROLS = ["Classic", "Modern"]
 
-# Health monitoring global state
 health_monitoring_active = False
 health_alert_states = {
     "left": {"alert_played": False},
@@ -89,6 +90,9 @@ health_alert_states = {
 }
 last_health_check_time = 0
 last_match_check_time = 0
+match_end_check_pending = False
+match_end_check_time = 0
+MATCH_END_CONFIRMATION_DELAY = 5
 
 def load_image(image_name):
     """Load an image from the media folder"""
@@ -256,7 +260,7 @@ def compare_images(img1, img2):
 def check_match_started(health_images):
     """Check if match has started by detecting red health bar on P1 side (left)"""
     try:
-        p1_region = HEALTH_REGIONS[0]  # Left side (P1/red)
+        p1_region = HEALTH_REGIONS[0]
         health_img = capture_region(p1_region)
         
         similarity = compare_images(health_img, health_images["red"])
@@ -270,7 +274,10 @@ def check_match_started(health_images):
 
 def check_health_bars(health_images):
     """Check both health bars for yellow (critical health) with confirmation"""
-    global health_alert_states
+    global health_alert_states, match_end_check_pending, match_end_check_time
+    
+    left_health_present = False
+    right_health_present = False
     
     for region in HEALTH_REGIONS:
         side = region["side"]
@@ -278,11 +285,17 @@ def check_health_bars(health_images):
         try:
             health_img = capture_region(region)
             
-            # Check if yellow
             yellow_similarity = compare_images(health_img, health_images["yellow"])
             
+            if side == "left":
+                red_similarity = compare_images(health_img, health_images["red"])
+                if yellow_similarity >= HEALTH_SIMILARITY_THRESHOLD or red_similarity >= HEALTH_SIMILARITY_THRESHOLD:
+                    left_health_present = True
+                blue_similarity = compare_images(health_img, health_images["blue"])
+                if yellow_similarity >= HEALTH_SIMILARITY_THRESHOLD or blue_similarity >= HEALTH_SIMILARITY_THRESHOLD:
+                    right_health_present = True
+            
             if yellow_similarity >= HEALTH_SIMILARITY_THRESHOLD:
-                # Potential yellow detected - confirm with additional checks
                 confirmed = True
                 for i in range(HEALTH_CONFIRMATION_CHECKS - 1):
                     time.sleep(HEALTH_CONFIRMATION_DELAY)
@@ -290,7 +303,6 @@ def check_health_bars(health_images):
                     yellow_similarity_confirm = compare_images(health_img_confirm, health_images["yellow"])
                     
                     if yellow_similarity_confirm < HEALTH_SIMILARITY_THRESHOLD:
-                        # Not consistently yellow, likely false positive
                         confirmed = False
                         print(f"False positive filtered on {side.upper()} side (confirmation {i+1} failed: {yellow_similarity_confirm * 100:.1f}%)")
                         break
@@ -300,21 +312,31 @@ def check_health_bars(health_images):
                     play_audio("CA_health.ogg")
                     health_alert_states[side]["alert_played"] = True
             else:
-                # Check if health has reset to its base color
-                # Left side = red, Right side = blue
                 if side == "left":
-                    base_color_similarity = compare_images(health_img, health_images["red"])
-                else:  # right side
-                    base_color_similarity = compare_images(health_img, health_images["blue"])
+                    base_color_similarity = red_similarity
+                else:
+                    base_color_similarity = blue_similarity
                 
                 if base_color_similarity >= HEALTH_SIMILARITY_THRESHOLD:
-                    # Reset alert for this side (new round started)
                     if health_alert_states[side]["alert_played"]:
                         print(f"Health reset detected on {side.upper()} side - ready for next alert")
                         health_alert_states[side]["alert_played"] = False
                         
         except Exception as e:
             print(f"Error checking {side} health bar: {e}")
+    
+    if not left_health_present and not right_health_present:
+        if not match_end_check_pending:
+            match_end_check_pending = True
+            match_end_check_time = time.time()
+            print("Health bars not detected - checking again in 5 seconds...")
+        elif time.time() - match_end_check_time >= MATCH_END_CONFIRMATION_DELAY:
+            print("\nMatch ended - Health monitoring deactivated\n")
+            return True
+    else:
+        match_end_check_pending = False
+    
+    return False 
 
 def name_capture_wizard(control_images):
     """Guide user through capturing their player name from both sides"""
@@ -478,7 +500,7 @@ def play_audio_sequence(audio_files):
             print(f"Error playing audio {audio_file}: {e}")
 
 def main():
-    global health_monitoring_active, last_health_check_time, last_match_check_time
+    global health_monitoring_active, last_health_check_time, last_match_check_time, match_end_check_pending
     
     print("\n" + "="*60)
     print("VISUAL AUDIO ASSIST - Street Fighter 6 Rank Announcer")
@@ -524,22 +546,27 @@ def main():
         print(f"Error loading division images: {e}")
         return
     
-    print("Loading health bar images...")
     health_images = {}
-    try:
-        health_images["red"] = load_image("red_health.png")
-        health_images["blue"] = load_image("blue_health.png")
-        health_images["yellow"] = load_image("yellow_health.png")
-        print(f"Loaded {len(health_images)} health bar images\n")
-    except Exception as e:
-        print(f"Error loading health bar images: {e}")
-        return
+    if ENABLE_HEALTH_MONITORING:
+        print("Loading health bar images...")
+        try:
+            health_images["red"] = load_image("red_health.png")
+            health_images["blue"] = load_image("blue_health.png")
+            health_images["yellow"] = load_image("yellow_health.png")
+            print(f"Loaded {len(health_images)} health bar images\n")
+        except Exception as e:
+            print(f"Error loading health bar images: {e}")
+            print("Continuing without health monitoring...\n")
+            health_images = None
     
     print(f"Monitoring VS screen on {platform.system()}...")
     print(f"Check interval: {CHECK_INTERVAL} seconds")
     print(f"Audio cooldown: {COOLDOWN_PERIOD} seconds")
     print(f"Control threshold: {CONTROL_SIMILARITY_THRESHOLD * 100}%")
-    print(f"Health monitoring: Enabled")
+    if ENABLE_HEALTH_MONITORING and health_images:
+        print(f"Health monitoring: Enabled")
+    else:
+        print(f"Health monitoring: Disabled")
     print("Press Ctrl+C to stop\n")
     
     last_audio_time = 0
@@ -548,24 +575,28 @@ def main():
         while True:
             current_time = time.time()
             
-            # Health monitoring logic
-            if not health_monitoring_active:
-                # Check every 2 seconds if match has started
-                if current_time - last_match_check_time >= MATCH_CHECK_INTERVAL:
-                    if check_match_started(health_images):
-                        print("\n" + "="*60)
-                        print("MATCH STARTED - Health monitoring activated")
-                        print("="*60 + "\n")
-                        health_monitoring_active = True
+            if ENABLE_HEALTH_MONITORING and health_images:
+                if not health_monitoring_active:
+                    if current_time - last_match_check_time >= MATCH_CHECK_INTERVAL:
+                        if check_match_started(health_images):
+                            print("\n" + "="*60)
+                            print("MATCH STARTED - Health monitoring activated")
+                            print("="*60 + "\n")
+                            health_monitoring_active = True
+                            last_health_check_time = current_time
+                        last_match_check_time = current_time
+                else:
+                    if current_time - last_health_check_time >= HEALTH_CHECK_INTERVAL:
+                        match_ended = check_health_bars(health_images)
+                        
+                        if match_ended:
+                            health_monitoring_active = False
+                            health_alert_states["left"]["alert_played"] = False
+                            health_alert_states["right"]["alert_played"] = False
+                            match_end_check_pending = False
+                        
                         last_health_check_time = current_time
-                    last_match_check_time = current_time
-            else:
-                # Monitor health bars every 1 second during match
-                if current_time - last_health_check_time >= HEALTH_CHECK_INTERVAL:
-                    check_health_bars(health_images)
-                    last_health_check_time = current_time
             
-            # VS screen detection
             left_region = CONTROL_REGIONS[0] 
             right_region = CONTROL_REGIONS[1]
             
@@ -672,7 +703,6 @@ def main():
                         
                         print("\nCapturing opponent rank region...")
                         
-                        # Optimized: Only capture opponent's rank
                         opponent_rank_region = RANK_REGIONS[0] if opponent_side == "left" else RANK_REGIONS[1]
                         
                         try:
@@ -681,7 +711,6 @@ def main():
                             
                             print(f"Opponent rank: {opponent_rank} ({opponent_sim * 100:.1f}%)")
                             
-                            # Check for division if rank requires it
                             division = None
                             if opponent_rank in RANKS_WITH_DIVISIONS and opponent_rank != "Unknown":
                                 print(f"\nRank requires division check, capturing division region...")
@@ -699,27 +728,23 @@ def main():
                                     print(f"Error capturing division: {e}, using base rank")
                             
                             if opponent_control:
-                                # Build audio sequence based on rank and division
                                 if opponent_rank == "Unknown":
-                                    # Play control + Unknown
                                     audio_files = [f"{opponent_control}.ogg", "Unknown.ogg"]
                                     print(f"\nRank unknown, playing control + Unknown")
                                 elif opponent_rank in RANKS_WITH_DIVISIONS and division:
-                                    # Play control + rank with division (e.g., BronzeTwo.ogg)
                                     audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}{division}.ogg"]
                                 else:
-                                    # Play control + base rank (e.g., Bronze.ogg)
                                     audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}.ogg"]
                                 
                                 print(f"\nPlaying audio sequence: {' -> '.join(audio_files)}")
                                 play_audio_sequence(audio_files)
                                 last_audio_time = current_time
                                 
-                                # Reset health monitoring for next match
-                                health_monitoring_active = False
-                                health_alert_states["left"]["alert_played"] = False
-                                health_alert_states["right"]["alert_played"] = False
-                                print("Health monitoring reset for next match")
+                                if ENABLE_HEALTH_MONITORING and health_images:
+                                    health_monitoring_active = False
+                                    health_alert_states["left"]["alert_played"] = False
+                                    health_alert_states["right"]["alert_played"] = False
+                                    print("Health monitoring reset for next match")
                                 
                                 print(f"{'='*60}\n")
                             else:

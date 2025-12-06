@@ -6,7 +6,11 @@ on:
   workflow_dispatch: {}
 
 jobs:
+
   build-linux:
+    strategy:
+      matrix:
+        variant: [full, basic]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,6 +19,11 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.13'
+      
+      - name: Disable health monitoring for basic version
+        if: matrix.variant == 'basic'
+        run: |
+          sed -i 's/ENABLE_HEALTH_MONITORING = True/ENABLE_HEALTH_MONITORING = False/' visualAudioAssist.py
       
       - name: Install system dependencies
         run: |
@@ -28,15 +37,18 @@ jobs:
       
       - name: Build Linux executable
         run: |
-          pyinstaller --onefile visualAudioAssist.py --add-data "media:media"
+          pyinstaller --onefile visualAudioAssist.py --add-data "media:media" --name visualAudioAssist-${{ matrix.variant }}
       
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: visualAudioAssist-linux
-          path: dist/visualAudioAssist
-  
+          name: visualAudioAssist-linux-${{ matrix.variant }}
+          path: dist/visualAudioAssist-${{ matrix.variant }}
+
   build-windows:
+    strategy:
+      matrix:
+        variant: [full, basic]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +58,11 @@ jobs:
         with:
           python-version: '3.13'
       
+      - name: Disable health monitoring for basic version
+        if: matrix.variant == 'basic'
+        run: |
+          (Get-Content visualAudioAssist.py) -replace 'ENABLE_HEALTH_MONITORING = True', 'ENABLE_HEALTH_MONITORING = False' | Set-Content visualAudioAssist.py
+      
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
@@ -53,13 +70,13 @@ jobs:
       
       - name: Build Windows executable
         run: |
-          pyinstaller --onefile visualAudioAssist.py --add-data "media;media"
+          pyinstaller --onefile visualAudioAssist.py --add-data "media;media" --name visualAudioAssist-${{ matrix.variant }}
       
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: visualAudioAssist-windows
-          path: dist/visualAudioAssist.exe
+          name: visualAudioAssist-windows-${{ matrix.variant }}
+          path: dist/visualAudioAssist-${{ matrix.variant }}.exe
 
   create-release:
     needs: [build-linux, build-windows]
@@ -73,20 +90,32 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            visualAudioAssist-linux/visualAudioAssist
-            visualAudioAssist-windows/visualAudioAssist.exe
+            visualAudioAssist-linux-full/visualAudioAssist-full
+            visualAudioAssist-linux-basic/visualAudioAssist-basic
+            visualAudioAssist-windows-full/visualAudioAssist-full.exe
+            visualAudioAssist-windows-basic/visualAudioAssist-basic.exe
           body: |
             ## Visual Audio Assist - Street Fighter 6 Rank Announcer
             
-            ### Changes in this version:
-            - See commit history for details
+            ### Two versions available:
+            
+            **Full Version** (with health monitoring):
+            - VS screen rank announcer
+            - Critical health warnings (< 25%)
+            - Automatic match detection
+            
+            **Basic Version** (rank announcer only):
+            - VS screen rank announcer only
+            - Lighter resource usage
             
             ### Downloads:
-            - **Windows**: `visualAudioAssist.exe`
-            - **Linux**: `visualAudioAssist`
+            - **Windows Full**: `visualAudioAssist-full.exe`
+            - **Windows Basic**: `visualAudioAssist-basic.exe`
+            - **Linux Full**: `visualAudioAssist-full`
+            - **Linux Basic**: `visualAudioAssist-basic`
             
             ### Installation:
-            1. Download the appropriate file for your OS
-            3. Run the executable
+            1. Download the appropriate file for your OS and preference
+            2. Run the executable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
