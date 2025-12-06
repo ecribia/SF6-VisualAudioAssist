@@ -579,9 +579,8 @@ def main():
                             opponent_rank = left_rank if opponent_side == "left" else right_rank
                             print(f"Opponent rank: {opponent_rank}")
                             
-                            # Check for division if rank requires it
                             division = None
-                            if opponent_rank in RANKS_WITH_DIVISIONS:
+                            if opponent_rank in RANKS_WITH_DIVISIONS and opponent_rank != "Unknown":
                                 print(f"\nRank requires division check, capturing division region...")
                                 try:
                                     division_region = DIVISION_REGIONS[0] if opponent_side == "left" else DIVISION_REGIONS[1]
@@ -591,14 +590,16 @@ def main():
                                     if division:
                                         print(f"Division detected: {division} ({div_sim * 100:.1f}%)")
                                     else:
-                                        print(f"No division match found (best: {div_sim * 100:.1f}%)")
+                                        print(f"No division match found (best: {div_sim * 100:.1f}%), using base rank")
                                         
                                 except Exception as e:
-                                    print(f"Error capturing division: {e}")
+                                    print(f"Error capturing division: {e}, using base rank")
                             
-                            if opponent_control and opponent_rank and opponent_rank != "Unknown":
-                                # Build audio sequence based on rank and division
-                                if division:
+                            if opponent_control:
+                                if opponent_rank == "Unknown":
+                                    audio_files = [f"{opponent_control}.ogg", "Unknown.ogg"]
+                                    print(f"\nRank unknown, playing control + Unknown")
+                                elif opponent_rank in RANKS_WITH_DIVISIONS and division:
                                     audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}{division}.ogg"]
                                 else:
                                     audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}.ogg"]
@@ -608,11 +609,7 @@ def main():
                                 last_audio_time = current_time
                                 print(f"{'='*60}\n")
                             else:
-                                print(f"\nSkipping audio - opponent info incomplete")
-                                if not opponent_control:
-                                    print("  Missing: opponent control")
-                                if not opponent_rank or opponent_rank == "Unknown":
-                                    print("  Missing: opponent rank")
+                                print(f"\nSkipping audio - opponent control not detected")
                                 print(f"{'='*60}\n")
                         else:
                             print("Failed to capture both rank regions")
