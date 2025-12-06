@@ -35,7 +35,7 @@ MIN_DIVISION_THRESHOLD = 0.70
 
 CONTROL_REGIONS = [
     {"top": 834, "left": 56, "width": 35, "height": 31, "side": "left"},
-    {"top": 835, "left": 1830, "width": 35, "height": 31, "side": "right"}
+    {"top": 834, "left": 1830, "width": 35, "height": 31, "side": "right"}
 ]
 
 RANK_REGIONS = [
@@ -579,6 +579,7 @@ def main():
                             opponent_rank = left_rank if opponent_side == "left" else right_rank
                             print(f"Opponent rank: {opponent_rank}")
                             
+                            # Check for division if rank requires it
                             division = None
                             if opponent_rank in RANKS_WITH_DIVISIONS and opponent_rank != "Unknown":
                                 print(f"\nRank requires division check, capturing division region...")
@@ -596,12 +597,16 @@ def main():
                                     print(f"Error capturing division: {e}, using base rank")
                             
                             if opponent_control:
+                                # Build audio sequence based on rank and division
                                 if opponent_rank == "Unknown":
+                                    # Play control + Unknown
                                     audio_files = [f"{opponent_control}.ogg", "Unknown.ogg"]
                                     print(f"\nRank unknown, playing control + Unknown")
                                 elif opponent_rank in RANKS_WITH_DIVISIONS and division:
+                                    # Play control + rank with division (e.g., BronzeTwo.ogg)
                                     audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}{division}.ogg"]
                                 else:
+                                    # Play control + base rank (e.g., Bronze.ogg)
                                     audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}.ogg"]
                                 
                                 print(f"\nPlaying audio sequence: {' -> '.join(audio_files)}")
