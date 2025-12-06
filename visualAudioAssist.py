@@ -32,6 +32,9 @@ COOLDOWN_PERIOD = 15
 CONTROL_SIMILARITY_THRESHOLD = 0.98
 MIN_RANK_THRESHOLD = 0.70
 MIN_DIVISION_THRESHOLD = 0.70
+HEALTH_SIMILARITY_THRESHOLD = 0.85
+MATCH_CHECK_INTERVAL = 2
+HEALTH_CHECK_INTERVAL = 1
 
 CONTROL_REGIONS = [
     {"top": 834, "left": 56, "width": 35, "height": 31, "side": "left"},
@@ -53,6 +56,11 @@ DIVISION_REGIONS = [
     {"top": 978, "left": 1757, "width": 76, "height": 14, "side": "right"}
 ]
 
+HEALTH_REGIONS = [
+    {"top": 65, "left": 820, "width": 24, "height": 31, "side": "left"},
+    {"top": 65, "left": 1076, "width": 24, "height": 31, "side": "right"}
+]
+
 IS_WINDOWS = platform.system() == "Windows"
 IS_LINUX = platform.system() == "Linux"
 
@@ -70,6 +78,14 @@ RANKS_WITH_DIVISIONS = ["Rookie", "Iron", "Bronze", "Silver", "Gold", "Platinum"
 DIVISIONS = ["One", "Two", "Three", "Four", "Five"]
 
 CONTROLS = ["Classic", "Modern"]
+
+health_monitoring_active = False
+health_alert_states = {
+    "left": {"alert_played": False},
+    "right": {"alert_played": False}
+}
+last_health_check_time = 0
+last_match_check_time = 0
 
 def load_image(image_name):
     """Load an image from the media folder"""
@@ -234,6 +250,52 @@ def compare_images(img1, img2):
     similarity = 1 - (mse / max_mse)
     return similarity
 
+def check_match_started(health_images):
+    """Check if match has started by detecting red health bar on P1 side (left)"""
+    try:
+        p1_region = HEALTH_REGIONS[0]
+        health_img = capture_region(p1_region)
+        
+        similarity = compare_images(health_img, health_images["red"])
+        
+        if similarity >= HEALTH_SIMILARITY_THRESHOLD:
+            return True
+    except Exception as e:
+        print(f"Error checking match start: {e}")
+    
+    return False
+
+def check_health_bars(health_images):
+    """Check both health bars for yellow (critical health)"""
+    global health_alert_states
+    
+    for region in HEALTH_REGIONS:
+        side = region["side"]
+        
+        try:
+            health_img = capture_region(region)
+            
+            yellow_similarity = compare_images(health_img, health_images["yellow"])
+            
+            if yellow_similarity >= HEALTH_SIMILARITY_THRESHOLD:
+                if not health_alert_states[side]["alert_played"]:
+                    print(f"\n⚠ Critical health detected on {side.upper()} side!")
+                    play_audio("CA_health.ogg")
+                    health_alert_states[side]["alert_played"] = True
+            else:
+                if side == "left":
+                    base_color_similarity = compare_images(health_img, health_images["red"])
+                else: 
+                    base_color_similarity = compare_images(health_img, health_images["blue"])
+                
+                if base_color_similarity >= HEALTH_SIMILARITY_THRESHOLD:
+                    if health_alert_states[side]["alert_played"]:
+                        print(f"Health reset detected on {side.upper()} side - ready for next alert")
+                        health_alert_states[side]["alert_played"] = False
+                        
+        except Exception as e:
+            print(f"Error checking {side} health bar: {e}")
+
 def name_capture_wizard(control_images):
     """Guide user through capturing their player name from both sides"""
     print("\n" + "="*60)
@@ -395,9 +457,8 @@ def play_audio_sequence(audio_files):
         except Exception as e:
             print(f"Error playing audio {audio_file}: {e}")
 
-
-
 def main():
+    global health_monitoring_active, last_health_check_time, last_match_check_time
     
     print("\n" + "="*60)
     print("VISUAL AUDIO ASSIST - Street Fighter 6 Rank Announcer")
@@ -443,16 +504,44 @@ def main():
         print(f"Error loading division images: {e}")
         return
     
+    print("Loading health bar images...")
+    health_images = {}
+    try:
+        health_images["red"] = load_image("red_health.png")
+        health_images["blue"] = load_image("blue_health.png")
+        health_images["yellow"] = load_image("yellow_health.png")
+        print(f"Loaded {len(health_images)} health bar images\n")
+    except Exception as e:
+        print(f"Error loading health bar images: {e}")
+        return
+    
     print(f"Monitoring VS screen on {platform.system()}...")
     print(f"Check interval: {CHECK_INTERVAL} seconds")
     print(f"Audio cooldown: {COOLDOWN_PERIOD} seconds")
     print(f"Control threshold: {CONTROL_SIMILARITY_THRESHOLD * 100}%")
+    print(f"Health monitoring: Enabled")
     print("Press Ctrl+C to stop\n")
     
     last_audio_time = 0
     
     try:
         while True:
+            current_time = time.time()
+            
+            if not health_monitoring_active:
+                if current_time - last_match_check_time >= MATCH_CHECK_INTERVAL:
+                    if check_match_started(health_images):
+                        print("\n" + "="*60)
+                        print("MATCH STARTED - Health monitoring activated")
+                        print("="*60 + "\n")
+                        health_monitoring_active = True
+                        last_health_check_time = current_time
+                    last_match_check_time = current_time
+            else:
+                if current_time - last_health_check_time >= HEALTH_CHECK_INTERVAL:
+                    check_health_bars(health_images)
+                    last_health_check_time = current_time
+            
             left_region = CONTROL_REGIONS[0] 
             right_region = CONTROL_REGIONS[1]
             
@@ -500,8 +589,6 @@ def main():
                     print(f"  Right: No match detected")
                 print(f"{'='*60}")
                 print("Ctrl+C to stop")
-                
-                current_time = time.time()
                 
                 if current_time - last_audio_time >= COOLDOWN_PERIOD:
                     try:
@@ -559,27 +646,16 @@ def main():
                             print(f"Error in name detection: {e}")
                             continue
                         
-                        print("\nCapturing rank regions...")
-                        rank_captures = {}
+                        print("\nCapturing opponent rank region...")
                         
-                        for region in RANK_REGIONS:
-                            try:
-                                rank_img = capture_region(region)
-                                rank_captures[region["side"]] = rank_img
-                            except Exception as e:
-                                print(f"Error capturing {region['side']} rank: {e}")
+                        opponent_rank_region = RANK_REGIONS[0] if opponent_side == "left" else RANK_REGIONS[1]
                         
-                        if len(rank_captures) == 2:
-                            left_rank, left_sim = find_best_rank_match(rank_captures["left"], rank_images)
-                            right_rank, right_sim = find_best_rank_match(rank_captures["right"], rank_images)
+                        try:
+                            opponent_rank_img = capture_region(opponent_rank_region)
+                            opponent_rank, opponent_sim = find_best_rank_match(opponent_rank_img, rank_images)
                             
-                            print(f"Left rank: {left_rank} ({left_sim * 100:.1f}%)")
-                            print(f"Right rank: {right_rank} ({right_sim * 100:.1f}%)")
+                            print(f"Opponent rank: {opponent_rank} ({opponent_sim * 100:.1f}%)")
                             
-                            opponent_rank = left_rank if opponent_side == "left" else right_rank
-                            print(f"Opponent rank: {opponent_rank}")
-                            
-                            # Check for division if rank requires it
                             division = None
                             if opponent_rank in RANKS_WITH_DIVISIONS and opponent_rank != "Unknown":
                                 print(f"\nRank requires division check, capturing division region...")
@@ -597,27 +673,30 @@ def main():
                                     print(f"Error capturing division: {e}, using base rank")
                             
                             if opponent_control:
-                                # Build audio sequence based on rank and division
                                 if opponent_rank == "Unknown":
-                                    # Play control + Unknown
                                     audio_files = [f"{opponent_control}.ogg", "Unknown.ogg"]
                                     print(f"\nRank unknown, playing control + Unknown")
                                 elif opponent_rank in RANKS_WITH_DIVISIONS and division:
-                                    # Play control + rank with division (e.g., BronzeTwo.ogg)
                                     audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}{division}.ogg"]
                                 else:
-                                    # Play control + base rank (e.g., Bronze.ogg)
                                     audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}.ogg"]
                                 
                                 print(f"\nPlaying audio sequence: {' -> '.join(audio_files)}")
                                 play_audio_sequence(audio_files)
                                 last_audio_time = current_time
+                                
+                                health_monitoring_active = False
+                                health_alert_states["left"]["alert_played"] = False
+                                health_alert_states["right"]["alert_played"] = False
+                                print("Health monitoring reset for next match")
+                                
                                 print(f"{'='*60}\n")
                             else:
                                 print(f"\nSkipping audio - opponent control not detected")
                                 print(f"{'='*60}\n")
-                        else:
-                            print("Failed to capture both rank regions")
+                                
+                        except Exception as e:
+                            print(f"Error capturing opponent rank: {e}")
                             print(f"{'='*60}\n")
                             
                     except Exception as e:
