@@ -31,6 +31,7 @@ CHECK_INTERVAL = 1
 COOLDOWN_PERIOD = 15
 CONTROL_SIMILARITY_THRESHOLD = 0.98
 MIN_RANK_THRESHOLD = 0.70
+MIN_DIVISION_THRESHOLD = 0.70
 
 CONTROL_REGIONS = [
     {"top": 834, "left": 56, "width": 35, "height": 31, "side": "left"},
@@ -47,19 +48,26 @@ NAME_REGIONS = [
     {"top": 912, "left": 1354, "width": 82, "height": 26, "side": "right"}
 ]
 
+DIVISION_REGIONS = [
+    {"top": 978, "left": 82, "width": 76, "height": 14, "side": "left"},
+    {"top": 978, "left": 1757, "width": 76, "height": 14, "side": "right"}
+]
+
 IS_WINDOWS = platform.system() == "Windows"
 IS_LINUX = platform.system() == "Linux"
 
 _capture_method = None
 _grim_path = None
 
-
-
 RANKS = [
     "NewChallenger", "Rookie", "Iron", "Bronze", "Silver", "Gold", 
     "Platinum", "Diamond", "Master", "HighMaster", 
     "GrandMaster", "UltimateMaster", "Legend"
 ]
+
+RANKS_WITH_DIVISIONS = ["Rookie", "Iron", "Bronze", "Silver", "Gold", "Platinum", "Diamond"]
+
+DIVISIONS = ["One", "Two", "Three", "Four", "Five"]
 
 CONTROLS = ["Classic", "Modern"]
 
@@ -356,6 +364,22 @@ def find_best_rank_match(captured_img, rank_images):
     
     return best_match, best_similarity
 
+def find_best_division_match(captured_img, division_images):
+    """Find the best matching division from all division images"""
+    best_match = None
+    best_similarity = 0
+    
+    for division_name, division_img in division_images.items():
+        similarity = compare_images(captured_img, division_img)
+        if similarity > best_similarity:
+            best_similarity = similarity
+            best_match = division_name
+    
+    if best_similarity < MIN_DIVISION_THRESHOLD:
+        return None, best_similarity
+    
+    return best_match, best_similarity
+
 def play_audio_sequence(audio_files):
     """Play multiple audio files in sequence"""
     for audio_file in audio_files:
@@ -407,6 +431,16 @@ def main():
         print(f"Loaded {len(rank_images)} rank images\n")
     except Exception as e:
         print(f"Error loading rank images: {e}")
+        return
+    
+    print("Loading division images...")
+    division_images = {}
+    try:
+        for division in DIVISIONS:
+            division_images[division] = load_image(f"{division.lower()}.png")
+        print(f"Loaded {len(division_images)} division images\n")
+    except Exception as e:
+        print(f"Error loading division images: {e}")
         return
     
     print(f"Monitoring VS screen on {platform.system()}...")
@@ -545,8 +579,30 @@ def main():
                             opponent_rank = left_rank if opponent_side == "left" else right_rank
                             print(f"Opponent rank: {opponent_rank}")
                             
+                            # Check for division if rank requires it
+                            division = None
+                            if opponent_rank in RANKS_WITH_DIVISIONS:
+                                print(f"\nRank requires division check, capturing division region...")
+                                try:
+                                    division_region = DIVISION_REGIONS[0] if opponent_side == "left" else DIVISION_REGIONS[1]
+                                    division_img = capture_region(division_region)
+                                    division, div_sim = find_best_division_match(division_img, division_images)
+                                    
+                                    if division:
+                                        print(f"Division detected: {division} ({div_sim * 100:.1f}%)")
+                                    else:
+                                        print(f"No division match found (best: {div_sim * 100:.1f}%)")
+                                        
+                                except Exception as e:
+                                    print(f"Error capturing division: {e}")
+                            
                             if opponent_control and opponent_rank and opponent_rank != "Unknown":
-                                audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}.ogg"]
+                                # Build audio sequence based on rank and division
+                                if division:
+                                    audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}{division}.ogg"]
+                                else:
+                                    audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}.ogg"]
+                                
                                 print(f"\nPlaying audio sequence: {' -> '.join(audio_files)}")
                                 play_audio_sequence(audio_files)
                                 last_audio_time = current_time
