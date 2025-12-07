@@ -33,7 +33,7 @@ The wizard has full audio guidance to walk you through each step.
 - Announces rank and control type only
 - Lightweight and simple
 
-** Full Version (Recommended)
+** Full Version
 - Everything in Basic
 - Critical health monitoring with audio alerts
 - Match start/end detection
