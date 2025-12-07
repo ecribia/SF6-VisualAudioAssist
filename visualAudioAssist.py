@@ -261,8 +261,8 @@ def compare_images(img1, img2):
     gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
     
     # Apply binary threshold to make white text pop out regardless of background
-    _, gray1 = cv2.threshold(gray1, 180, 255, cv2.THRESH_BINARY)
-    _, gray2 = cv2.threshold(gray2, 180, 255, cv2.THRESH_BINARY)
+    _, gray1 = cv2.threshold(gray1, 150, 255, cv2.THRESH_BINARY)
+    _, gray2 = cv2.threshold(gray2, 150, 255, cv2.THRESH_BINARY)
     
     mse = np.mean((gray1.astype(float) - gray2.astype(float)) ** 2)
     max_mse = 255 ** 2
