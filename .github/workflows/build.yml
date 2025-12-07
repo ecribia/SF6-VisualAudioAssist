@@ -106,7 +106,6 @@ jobs:
             
             **Basic Version** (rank announcer only):
             - VS screen rank announcer only
-            - Lighter resource usage
             
             ### Downloads:
             - **Windows Full**: `visualAudioAssist-full.exe`
