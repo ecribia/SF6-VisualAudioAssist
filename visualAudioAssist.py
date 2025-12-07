@@ -34,11 +34,10 @@ COOLDOWN_PERIOD = 15
 CONTROL_SIMILARITY_THRESHOLD = 0.98
 MIN_RANK_THRESHOLD = 0.70
 MIN_DIVISION_THRESHOLD = 0.70
-HEALTH_SIMILARITY_THRESHOLD = 0.999
 MATCH_CHECK_INTERVAL = 2
-HEALTH_CHECK_INTERVAL = 0.5
-HEALTH_CONFIRMATION_CHECKS = 2
-HEALTH_CONFIRMATION_DELAY = 0.2
+HEALTH_CHECK_INTERVAL = 0.3
+HEALTH_CONFIRMATION_CHECKS = 3
+HEALTH_CONFIRMATION_DELAY = 0.1
 
 CONTROL_REGIONS = [
     {"top": 834, "left": 56, "width": 35, "height": 31, "side": "left"},
@@ -61,8 +60,8 @@ DIVISION_REGIONS = [
 ]
 
 HEALTH_REGIONS = [
-    {"top": 65, "left": 820, "width": 24, "height": 31, "side": "left"},
-    {"top": 65, "left": 1076, "width": 24, "height": 31, "side": "right"}
+    {"top": 73, "left": 820, "width": 24, "height": 15, "side": "left"},
+    {"top": 73, "left": 1076, "width": 24, "height": 15, "side": "right"}
 ]
 
 IS_WINDOWS = platform.system() == "Windows"
@@ -257,22 +256,67 @@ def compare_images(img1, img2):
     similarity = 1 - (mse / max_mse)
     return similarity
 
-def check_match_started(health_images):
+def check_health_color(img):
+    """Check if captured health region matches red, blue, or yellow color ranges"""
+    # Sample center area
+    h, w = img.shape[:2]
+    center = img[h//2-3:h//2+4, w//2-3:w//2+4]
+    
+    # Count pixels matching each color (BGR format)
+    total_pixels = center.shape[0] * center.shape[1]
+    
+    # Red: d91c5f → BGR(95, 28, 217)
+    red_mask = (
+        (center[:,:,2] >= 215) & (center[:,:,2] <= 220) &
+        (center[:,:,1] >= 26) & (center[:,:,1] <= 30) &
+        (center[:,:,0] >= 93) & (center[:,:,0] <= 97)
+    )
+    red_matches = np.sum(red_mask)
+    
+    # Yellow: fcf86b → BGR(107, 248, 252)
+    yellow_mask = (
+        (center[:,:,2] >= 250) & (center[:,:,2] <= 253) &
+        (center[:,:,1] >= 246) & (center[:,:,1] <= 250) &
+        (center[:,:,0] >= 105) & (center[:,:,0] <= 110)
+    )
+    yellow_matches = np.sum(yellow_mask)
+    
+    # Blue: 0d6bba → BGR(186, 107, 13)
+    blue_mask = (
+        (center[:,:,2] >= 12) & (center[:,:,2] <= 15) &
+        (center[:,:,1] >= 105) & (center[:,:,1] <= 110) &
+        (center[:,:,0] >= 184) & (center[:,:,0] <= 188)
+    )
+    blue_matches = np.sum(blue_mask)
+    
+    # Require 80% match
+    threshold = total_pixels * 0.8
+    
+    if red_matches >= threshold:
+        return 'red'
+    elif yellow_matches >= threshold:
+        return 'yellow'
+    elif blue_matches >= threshold:
+        return 'blue'
+    
+    return None
+
+def check_match_started():
     """Check if match has started by detecting red health bar on P1 side (left)"""
     try:
         p1_region = HEALTH_REGIONS[0]
         health_img = capture_region(p1_region)
         
-        similarity = compare_images(health_img, health_images["red"])
+        color = check_health_color(health_img)
         
-        if similarity >= HEALTH_SIMILARITY_THRESHOLD:
+        if color == 'red':
             return True
     except Exception as e:
         print(f"Error checking match start: {e}")
     
     return False
 
-def check_health_bars(health_images):
+def check_health_bars():
     """Check both health bars for yellow (critical health) with confirmation"""
     global health_alert_states, match_end_check_pending, match_end_check_time
     
@@ -284,40 +328,34 @@ def check_health_bars(health_images):
         
         try:
             health_img = capture_region(region)
-            
-            yellow_similarity = compare_images(health_img, health_images["yellow"])
+            color = check_health_color(health_img)
             
             if side == "left":
-                red_similarity = compare_images(health_img, health_images["red"])
-                if yellow_similarity >= HEALTH_SIMILARITY_THRESHOLD or red_similarity >= HEALTH_SIMILARITY_THRESHOLD:
+                if color in ['red', 'yellow']:
                     left_health_present = True
-                blue_similarity = compare_images(health_img, health_images["blue"])
-                if yellow_similarity >= HEALTH_SIMILARITY_THRESHOLD or blue_similarity >= HEALTH_SIMILARITY_THRESHOLD:
+                if color in ['blue', 'yellow']:
                     right_health_present = True
             
-            if yellow_similarity >= HEALTH_SIMILARITY_THRESHOLD:
+            if color == 'yellow':
                 confirmed = True
                 for i in range(HEALTH_CONFIRMATION_CHECKS - 1):
                     time.sleep(HEALTH_CONFIRMATION_DELAY)
                     health_img_confirm = capture_region(region)
-                    yellow_similarity_confirm = compare_images(health_img_confirm, health_images["yellow"])
+                    color_confirm = check_health_color(health_img_confirm)
                     
-                    if yellow_similarity_confirm < HEALTH_SIMILARITY_THRESHOLD:
+                    if color_confirm != 'yellow':
                         confirmed = False
-                        print(f"False positive filtered on {side.upper()} side (confirmation {i+1} failed: {yellow_similarity_confirm * 100:.1f}%)")
+                        print(f"False positive filtered on {side.upper()} side (confirmation {i+1} failed: {color_confirm})")
                         break
                 
                 if confirmed and not health_alert_states[side]["alert_played"]:
-                    print(f"\n⚠ Critical health CONFIRMED on {side.upper()} side! ({yellow_similarity * 100:.1f}%)")
+                    print(f"\n⚠️  Critical health CONFIRMED on {side.upper()} side!")
                     play_audio("CA_health.ogg")
                     health_alert_states[side]["alert_played"] = True
             else:
-                if side == "left":
-                    base_color_similarity = red_similarity
-                else:
-                    base_color_similarity = blue_similarity
+                base_color = 'red' if side == 'left' else 'blue'
                 
-                if base_color_similarity >= HEALTH_SIMILARITY_THRESHOLD:
+                if color == base_color:
                     if health_alert_states[side]["alert_played"]:
                         print(f"Health reset detected on {side.upper()} side - ready for next alert")
                         health_alert_states[side]["alert_played"] = False
@@ -325,18 +363,21 @@ def check_health_bars(health_images):
         except Exception as e:
             print(f"Error checking {side} health bar: {e}")
     
-    if not left_health_present and not right_health_present:
-        if not match_end_check_pending:
-            match_end_check_pending = True
-            match_end_check_time = time.time()
-            print("Health bars not detected - checking again in 5 seconds...")
-        elif time.time() - match_end_check_time >= MATCH_END_CONFIRMATION_DELAY:
-            print("\nMatch ended - Health monitoring deactivated\n")
-            return True
-    else:
-        match_end_check_pending = False
+    if left_health_present or right_health_present:
+        if match_end_check_pending:
+            print("Health bars detected again - match still active")
+            match_end_check_pending = False
+        return False
     
-    return False 
+    if not match_end_check_pending:
+        match_end_check_pending = True
+        match_end_check_time = time.time()
+        print("Health bars not detected - confirming match end over 5 seconds...")
+    elif time.time() - match_end_check_time >= MATCH_END_CONFIRMATION_DELAY:
+        print("\nMatch ended - Health monitoring deactivated\n")
+        return True
+    
+    return False
 
 def name_capture_wizard(control_images):
     """Guide user through capturing their player name from both sides"""
@@ -546,25 +587,12 @@ def main():
         print(f"Error loading division images: {e}")
         return
     
-    health_images = {}
-    if ENABLE_HEALTH_MONITORING:
-        print("Loading health bar images...")
-        try:
-            health_images["red"] = load_image("red_health.png")
-            health_images["blue"] = load_image("blue_health.png")
-            health_images["yellow"] = load_image("yellow_health.png")
-            print(f"Loaded {len(health_images)} health bar images\n")
-        except Exception as e:
-            print(f"Error loading health bar images: {e}")
-            print("Continuing without health monitoring...\n")
-            health_images = None
-    
     print(f"Monitoring VS screen on {platform.system()}...")
     print(f"Check interval: {CHECK_INTERVAL} seconds")
     print(f"Audio cooldown: {COOLDOWN_PERIOD} seconds")
     print(f"Control threshold: {CONTROL_SIMILARITY_THRESHOLD * 100}%")
-    if ENABLE_HEALTH_MONITORING and health_images:
-        print(f"Health monitoring: Enabled")
+    if ENABLE_HEALTH_MONITORING:
+        print(f"Health monitoring: Enabled (color-based detection)")
     else:
         print(f"Health monitoring: Disabled")
     print("Press Ctrl+C to stop\n")
@@ -575,10 +603,10 @@ def main():
         while True:
             current_time = time.time()
             
-            if ENABLE_HEALTH_MONITORING and health_images:
+            if ENABLE_HEALTH_MONITORING:
                 if not health_monitoring_active:
                     if current_time - last_match_check_time >= MATCH_CHECK_INTERVAL:
-                        if check_match_started(health_images):
+                        if check_match_started():
                             print("\n" + "="*60)
                             print("MATCH STARTED - Health monitoring activated")
                             print("="*60 + "\n")
@@ -587,7 +615,7 @@ def main():
                         last_match_check_time = current_time
                 else:
                     if current_time - last_health_check_time >= HEALTH_CHECK_INTERVAL:
-                        match_ended = check_health_bars(health_images)
+                        match_ended = check_health_bars()
                         
                         if match_ended:
                             health_monitoring_active = False
@@ -740,7 +768,7 @@ def main():
                                 play_audio_sequence(audio_files)
                                 last_audio_time = current_time
                                 
-                                if ENABLE_HEALTH_MONITORING and health_images:
+                                if ENABLE_HEALTH_MONITORING:
                                     health_monitoring_active = False
                                     health_alert_states["left"]["alert_played"] = False
                                     health_alert_states["right"]["alert_played"] = False
