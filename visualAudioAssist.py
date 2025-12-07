@@ -31,7 +31,7 @@ ENABLE_HEALTH_MONITORING = True
 MEDIA_FOLDER = get_resource_path("media")
 CHECK_INTERVAL = 1
 COOLDOWN_PERIOD = 15
-CONTROL_SIMILARITY_THRESHOLD = 0.97
+CONTROL_SIMILARITY_THRESHOLD = 0.98
 MIN_RANK_THRESHOLD = 0.90
 MIN_DIVISION_THRESHOLD = 0.90
 MIN_MR_THRESHOLD = 0.95
@@ -726,7 +726,7 @@ def main():
                             left_screen_img = capture_region(left_region)
                             left_still_present = False
                             for control_name, control_img in control_images.items():
-                                similarity = compare_images(left_screen_img, control_img)
+                                similarity = compare_images_no_threshold(left_screen_img, control_img)
                                 if similarity >= CONTROL_SIMILARITY_THRESHOLD:
                                     left_still_present = True
                                     break
