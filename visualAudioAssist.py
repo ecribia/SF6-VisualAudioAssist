@@ -533,7 +533,7 @@ def find_best_division_match(captured_img, division_images):
     best_similarity = 0
     
     for division_name, division_img in division_images.items():
-        similarity = compare_images(captured_img, division_img)
+        similarity = compare_images_no_threshold(captured_img, division_img)
         if similarity > best_similarity:
             best_similarity = similarity
             best_match = division_name
