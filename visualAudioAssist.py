@@ -254,7 +254,7 @@ def capture_region(region):
         raise NotImplementedError(f"Unsupported OS: {platform.system()}")
 
 def compare_images(img1, img2):
-    """Compare two images and return similarity score"""
+    """Compare two images with binary threshold for better text/icon detection"""
     if img1.shape != img2.shape:
         img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
     gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
@@ -264,6 +264,17 @@ def compare_images(img1, img2):
     _, gray1 = cv2.threshold(gray1, 180, 255, cv2.THRESH_BINARY)
     _, gray2 = cv2.threshold(gray2, 180, 255, cv2.THRESH_BINARY)
     
+    mse = np.mean((gray1.astype(float) - gray2.astype(float)) ** 2)
+    max_mse = 255 ** 2
+    similarity = 1 - (mse / max_mse)
+    return similarity
+
+def compare_images_no_threshold(img1, img2):
+    """Compare images without thresholding (for control icons and names)"""
+    if img1.shape != img2.shape:
+        img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
+    gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+    gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
     mse = np.mean((gray1.astype(float) - gray2.astype(float)) ** 2)
     max_mse = 255 ** 2
     similarity = 1 - (mse / max_mse)
@@ -412,7 +423,7 @@ def name_capture_wizard(control_images):
             screen_img = capture_region(left_region)
             
             for control_name, control_img in control_images.items():
-                similarity = compare_images(screen_img, control_img)
+                similarity = compare_images_no_threshold(screen_img, control_img)
                 
                 if similarity >= CONTROL_SIMILARITY_THRESHOLD:
                     print("VS screen detected!")
@@ -461,7 +472,7 @@ def name_capture_wizard(control_images):
             screen_img = capture_region(right_region)
             
             for control_name, control_img in control_images.items():
-                similarity = compare_images(screen_img, control_img)
+                similarity = compare_images_no_threshold(screen_img, control_img)
                 
                 if similarity >= CONTROL_SIMILARITY_THRESHOLD:
                     print("VS screen detected!")
@@ -469,7 +480,7 @@ def name_capture_wizard(control_images):
                     time.sleep(1)
                     
                     screen_img = capture_region(right_region)
-                    similarity = compare_images(screen_img, control_img)
+                    similarity = compare_images_no_threshold(screen_img, control_img)
                     
                     if similarity >= CONTROL_SIMILARITY_THRESHOLD:
                         print("VS screen still present. Capturing player name from right side...")
@@ -668,7 +679,7 @@ def main():
                 screen_img = capture_region(left_region)
                 
                 for control_name, control_img in control_images.items():
-                    similarity = compare_images(screen_img, control_img)
+                    similarity = compare_images_no_threshold(screen_img, control_img)
                     
                     if similarity >= CONTROL_SIMILARITY_THRESHOLD:
                         left_control = control_name
@@ -739,10 +750,10 @@ def main():
                             left_name_img = capture_region(NAME_REGIONS[0])
                             right_name_img = capture_region(NAME_REGIONS[1])
                             
-                            left_vs_left = compare_images(player_name_left, left_name_img)
-                            left_vs_right = compare_images(player_name_left, right_name_img)
-                            right_vs_left = compare_images(player_name_right, left_name_img)
-                            right_vs_right = compare_images(player_name_right, right_name_img)
+                            left_vs_left = compare_images_no_threshold(player_name_left, left_name_img)
+                            left_vs_right = compare_images_no_threshold(player_name_left, right_name_img)
+                            right_vs_left = compare_images_no_threshold(player_name_right, left_name_img)
+                            right_vs_right = compare_images_no_threshold(player_name_right, right_name_img)
                             
                             left_side_max = max(left_vs_left, right_vs_left)
                             right_side_max = max(left_vs_right, right_vs_right)
