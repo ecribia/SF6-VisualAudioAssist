@@ -32,8 +32,9 @@ MEDIA_FOLDER = get_resource_path("media")
 CHECK_INTERVAL = 1
 COOLDOWN_PERIOD = 15
 CONTROL_SIMILARITY_THRESHOLD = 0.98
-MIN_RANK_THRESHOLD = 0.70
-MIN_DIVISION_THRESHOLD = 0.70
+MIN_RANK_THRESHOLD = 0.90
+MIN_DIVISION_THRESHOLD = 0.90
+MIN_MR_THRESHOLD = 0.95
 MATCH_CHECK_INTERVAL = 2
 HEALTH_CHECK_INTERVAL = 0.3
 HEALTH_CONFIRMATION_CHECKS = 3
@@ -64,6 +65,11 @@ HEALTH_REGIONS = [
     {"top": 73, "left": 1076, "width": 24, "height": 15, "side": "right"}
 ]
 
+MR_REGIONS = [
+    {"top": 993, "left": 38, "width": 14, "height": 23, "side": "left"},
+    {"top": 993, "left": 1713, "width": 14, "height": 23, "side": "right"}
+]
+
 IS_WINDOWS = platform.system() == "Windows"
 IS_LINUX = platform.system() == "Linux"
 
@@ -79,6 +85,8 @@ RANKS = [
 RANKS_WITH_DIVISIONS = ["Rookie", "Iron", "Bronze", "Silver", "Gold", "Platinum", "Diamond"]
 
 DIVISIONS = ["One", "Two", "Three", "Four", "Five"]
+
+MR_VALUES = ["1000", "1100", "1200", "1300", "1400", "1500"]
 
 CONTROLS = ["Classic", "Modern"]
 
@@ -251,6 +259,11 @@ def compare_images(img1, img2):
         img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
     gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
     gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+    
+    # Apply binary threshold to make white text pop out regardless of background
+    _, gray1 = cv2.threshold(gray1, 180, 255, cv2.THRESH_BINARY)
+    _, gray2 = cv2.threshold(gray2, 180, 255, cv2.THRESH_BINARY)
+    
     mse = np.mean((gray1.astype(float) - gray2.astype(float)) ** 2)
     max_mse = 255 ** 2
     similarity = 1 - (mse / max_mse)
@@ -258,14 +271,11 @@ def compare_images(img1, img2):
 
 def check_health_color(img):
     """Check if captured health region matches red, blue, or yellow color ranges"""
-    # Sample center area
     h, w = img.shape[:2]
     center = img[h//2-3:h//2+4, w//2-3:w//2+4]
     
-    # Count pixels matching each color (BGR format)
     total_pixels = center.shape[0] * center.shape[1]
     
-    # Red: d91c5f → BGR(95, 28, 217)
     red_mask = (
         (center[:,:,2] >= 215) & (center[:,:,2] <= 220) &
         (center[:,:,1] >= 26) & (center[:,:,1] <= 30) &
@@ -273,7 +283,6 @@ def check_health_color(img):
     )
     red_matches = np.sum(red_mask)
     
-    # Yellow: fcf86b → BGR(107, 248, 252)
     yellow_mask = (
         (center[:,:,2] >= 250) & (center[:,:,2] <= 253) &
         (center[:,:,1] >= 246) & (center[:,:,1] <= 250) &
@@ -281,7 +290,6 @@ def check_health_color(img):
     )
     yellow_matches = np.sum(yellow_mask)
     
-    # Blue: 0d6bba → BGR(186, 107, 13)
     blue_mask = (
         (center[:,:,2] >= 12) & (center[:,:,2] <= 15) &
         (center[:,:,1] >= 105) & (center[:,:,1] <= 110) &
@@ -289,7 +297,6 @@ def check_health_color(img):
     )
     blue_matches = np.sum(blue_mask)
     
-    # Require 80% match
     threshold = total_pixels * 0.8
     
     if red_matches >= threshold:
@@ -525,6 +532,22 @@ def find_best_division_match(captured_img, division_images):
     
     return best_match, best_similarity
 
+def find_best_mr_match(captured_img, mr_images):
+    """Find the best matching MR value from MR images"""
+    best_match = None
+    best_similarity = 0
+    
+    for mr_value, mr_img in mr_images.items():
+        similarity = compare_images(captured_img, mr_img)
+        if similarity > best_similarity:
+            best_similarity = similarity
+            best_match = mr_value
+    
+    if best_similarity < MIN_MR_THRESHOLD:
+        return None, best_similarity
+    
+    return best_match, best_similarity
+
 def play_audio_sequence(audio_files):
     """Play multiple audio files in sequence"""
     for audio_file in audio_files:
@@ -585,6 +608,16 @@ def main():
         print(f"Loaded {len(division_images)} division images\n")
     except Exception as e:
         print(f"Error loading division images: {e}")
+        return
+    
+    print("Loading MR images...")
+    mr_images = {}
+    try:
+        for mr_value in MR_VALUES:
+            mr_images[mr_value] = load_image(f"{mr_value}.png")
+        print(f"Loaded {len(mr_images)} MR images\n")
+    except Exception as e:
+        print(f"Error loading MR images: {e}")
         return
     
     print(f"Monitoring VS screen on {platform.system()}...")
@@ -740,7 +773,26 @@ def main():
                             print(f"Opponent rank: {opponent_rank} ({opponent_sim * 100:.1f}%)")
                             
                             division = None
-                            if opponent_rank in RANKS_WITH_DIVISIONS and opponent_rank != "Unknown":
+                            mr_value = None
+                            
+                            # Check if rank is exactly "Master" for MR detection
+                            if opponent_rank == "Master":
+                                print(f"\nMaster rank detected, checking MR region...")
+                                try:
+                                    mr_region = MR_REGIONS[0] if opponent_side == "left" else MR_REGIONS[1]
+                                    mr_img = capture_region(mr_region)
+                                    mr_value, mr_sim = find_best_mr_match(mr_img, mr_images)
+                                    
+                                    if mr_value:
+                                        print(f"MR detected: {mr_value} ({mr_sim * 100:.1f}%)")
+                                    else:
+                                        print(f"No MR match found (best: {mr_sim * 100:.1f}%), using base Master")
+                                        
+                                except Exception as e:
+                                    print(f"Error capturing MR: {e}, using base Master")
+                            
+                            # Check division for ranks that have divisions
+                            elif opponent_rank in RANKS_WITH_DIVISIONS and opponent_rank != "Unknown":
                                 print(f"\nRank requires division check, capturing division region...")
                                 try:
                                     division_region = DIVISION_REGIONS[0] if opponent_side == "left" else DIVISION_REGIONS[1]
@@ -759,6 +811,9 @@ def main():
                                 if opponent_rank == "Unknown":
                                     audio_files = [f"{opponent_control}.ogg", "Unknown.ogg"]
                                     print(f"\nRank unknown, playing control + Unknown")
+                                elif opponent_rank == "Master" and mr_value:
+                                    # Play MR audio if detected
+                                    audio_files = [f"{opponent_control}.ogg", f"{mr_value}.ogg"]
                                 elif opponent_rank in RANKS_WITH_DIVISIONS and division:
                                     audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}{division}.ogg"]
                                 else:
