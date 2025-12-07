@@ -1,0 +1,44 @@
+* What is this?
+
+Visual Audio Assist is an accessibility tool for Street Fighter 6 that announces your opponent's rank and control type (Classic/Modern) with audio cues during the VS screen. It also monitors health bars and alerts you when either player reaches critical health.
+
+* Features
+
+- Announces opponent's rank (e.g., "Classic Gold 3", "Modern Diamond 4")
+- Announces Master rank players with their MR rating (1000-1500)
+- Critical health alerts during matches
+- Audio-guided setup wizard
+
+* Installation
+
+** Requirements
+- Street Fighter 6 running at 1920x1080 resolution
+
+** Setup
+1. Download the appropriate version under 'Releases'
+2. Run the program - it will automatically start the **Name Capture Wizard**
+3. Follow the audio instructions:
+   - Open a replay where you're on the LEFT side
+   - Wait for the VS screen
+   - The wizard captures your name automatically
+   - Open a replay where you're on the RIGHT side
+   - Wait for the VS screen again
+   - Setup complete!
+
+The wizard has full audio guidance to walk you through each step.
+
+* Versions
+
+** Basic Version
+- Announces rank and control type only
+- Lightweight and simple
+
+** Full Version (Recommended)
+- Everything in Basic
+- Critical health monitoring with audio alerts
+- Match start/end detection
+
+* Notes
+
+- The program is very accurate but occasional detection errors may occur due to unusual lighting conditions and/or certain backgrounds
+- If detection seems off, you can re-run the Name Capture Wizard by deleting MyNameLeft.png and MyNameRight.png, created by the wizard.
