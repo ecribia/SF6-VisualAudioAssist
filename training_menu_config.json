@@ -305,6 +305,6 @@
   "audio": {
     "folder": "media/menu",
     "naming_convention": "lowercase_with_underscores",
-    "extension": ".wav"
+    "extension": ".ogg"
   }
 }
