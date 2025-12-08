@@ -153,7 +153,7 @@ def save_player_name_image(img, side):
         print(f"Error saving player name image: {e}")
         return False
 
-def play_audio(audio_file, subfolder=None):
+def play_audio(audio_file, subfolder=None, allow_interrupt=False):
     if subfolder:
         audio_path = MEDIA_FOLDER / subfolder / audio_file
     else:
@@ -163,10 +163,15 @@ def play_audio(audio_file, subfolder=None):
         print(f"Audio file not found: {audio_file}")
         return
     try:
+        if allow_interrupt and mixer.music.get_busy():
+            mixer.music.stop()
+        
         mixer.music.load(str(audio_path))
         mixer.music.play()
-        while mixer.music.get_busy():
-            time.sleep(0.05)
+        
+        if not allow_interrupt:
+            while mixer.music.get_busy():
+                time.sleep(0.05)
     except Exception as e:
         print(f"Error playing audio {audio_file}: {e}")
 
@@ -1054,7 +1059,7 @@ def main():
                                 
                                 audio_file = item_name_to_audio_file(selected_item, training_menu_config)
                                 print(f"Playing: {audio_file}")
-                                play_audio(audio_file, "menu")
+                                play_audio(audio_file, "menu", allow_interrupt=True)
                                 
                                 menu_last_selected_item = selected_item
                                 menu_last_item_position = item_position
