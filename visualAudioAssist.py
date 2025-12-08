@@ -170,6 +170,23 @@ def play_audio(audio_file, subfolder=None):
     except Exception as e:
         print(f"Error playing audio {audio_file}: {e}")
 
+def play_health_alert(side):
+    audio_path = MEDIA_FOLDER / "CA_health.ogg"
+    if not audio_path.exists():
+        print(f"Audio file not found: CA_health.ogg")
+        return
+    try:
+        sound = mixer.Sound(str(audio_path))
+        channel = sound.play()
+        if side == "left":
+            channel.set_volume(1.0, 0.0)
+        else:
+            channel.set_volume(0.0, 1.0)
+        while channel.get_busy():
+            time.sleep(0.05)
+    except Exception as e:
+        print(f"Error playing health alert: {e}")
+
 def capture_region_windows(region):
     import mss
     with mss.mss() as sct:
@@ -350,7 +367,7 @@ def check_health_bars():
                 
                 if confirmed and not health_alert_states[side]["alert_played"]:
                     print(f"\nCritical health CONFIRMED on {side.upper()} side!")
-                    play_audio("CA_health.ogg")
+                    play_health_alert(side)
                     health_alert_states[side]["alert_played"] = True
             else:
                 base_color = 'red' if side == 'left' else 'blue'
