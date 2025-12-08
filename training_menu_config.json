@@ -1,0 +1,310 @@
+{
+  "detection_settings": {
+    "menu_check_interval": 1.0,
+    "menu_match_threshold": 0.96,
+    "binary_threshold": 230,
+    "white_pixel_threshold": 200,
+    "submenu_match_threshold": 0.92
+  },
+  "tab_detection": {
+    "region": {
+      "top": 34,
+      "left": 877,
+      "width": 165,
+      "height": 15
+    },
+    "reference_image": "training_menu.png",
+    "num_tabs": 8
+  },
+  "submenu_detection": {
+    "enabled_in_tabs": ["Reversal Settings"],
+    "tab_region": {
+      "top": 34,
+      "left": 898,
+      "width": 124,
+      "height": 15
+    },
+    "reference_image": "training_sub_move_menu.png",
+    "num_tabs": 6
+  },
+  "item_detection": {
+    "check_region": {
+      "left": 952,
+      "width": 33,
+      "height": 15
+    },
+    "positions": [174, 236, 297, 356, 414, 472, 536, 596, 655, 715, 775, 833, 895],
+    "average_gap": 60
+  },
+  "tabs": {
+    "Basic Settings": {
+      "tab_number": 1,
+      "start_position": 1,
+      "items": [
+        "Replay Saved Status",
+        "Save Status",
+        "Command List",
+        "Control Settings",
+        "Shortcut Settings",
+        "Options",
+        "Restore Default Settings",
+        null,
+        "View Tutorials",
+        "Open Recent Replays",
+        "Open Matchmaking Settings",
+        "Return to Character Select",
+        "Return to Mode Select"
+      ]
+    },
+    "Environment Settings": {
+      "tab_number": 2,
+      "start_position": 1,
+      "items": [
+        "Restart Battle",
+        "Start Position",
+        "P1 Side",
+        "Game Speed",
+        "Input Delay",
+        null,
+        "P1 Character Select",
+        "P2 Character Select",
+        "Character-Specific Settings",
+        "Change Stage",
+        "Music Player",
+        "Revert Changes"
+      ]
+    },
+    "Dummy Settings": {
+      "tab_number": 3,
+      "start_position": 1,
+      "items": [
+        "Dummy Controls",
+        "Dummy Behavior",
+        "Counter",
+        "Block",
+        "Block Count",
+        "Switch Block",
+        "Block Type",
+        "Drive Reversal",
+        "Drive Reversal Activation Delay",
+        "Drive Reversal Activation Count",
+        "Throw Escape",
+        "Recovery"
+      ]
+    },
+    "Recording Settings": {
+      "tab_number": 4,
+      "start_position": 2,
+      "has_sub_tabs": true,
+      "sub_tab_detection": {
+        "positions": [
+          {"name": "Record", "left": 804, "top": 157, "width": 19, "height": 10},
+          {"name": "Replay", "left": 1133, "top": 155, "width": 17, "height": 11}
+        ]
+      },
+      "sub_tabs": {
+        "Record": [
+          null,
+          "Slot 1",
+          "Slot 2",
+          "Slot 3",
+          "Slot 4",
+          "Slot 5",
+          "Slot 6",
+          "Slot 7",
+          "Slot 8",
+          null,
+          "Recording Trigger",
+          "Countdown"
+        ],
+        "Replay": [
+          "Start Replay",
+          "Slot 1",
+          "Slot 2",
+          "Slot 3",
+          "Slot 4",
+          "Slot 5",
+          "Slot 6",
+          "Slot 7",
+          "Slot 8",
+          null,
+          "Replay Info Display",
+          "Repeat Replay"
+        ]
+      }
+    },
+    "Reversal Settings": {
+      "tab_number": 5,
+      "start_position": 2,
+      "has_sub_tabs": true,
+      "has_submenu": true,
+      "sub_tab_detection": {
+        "positions": [
+          {"name": "Wake-up Reversal", "left": 674, "top": 156, "width": 15, "height": 10},
+          {"name": "Block Reversal", "left": 965, "top": 157, "width": 19, "height": 10},
+          {"name": "Reversal After Damage", "left": 1289, "top": 156, "width": 14, "height": 8}
+        ]
+      },
+      "sub_tabs": {
+        "Wake-up Reversal": [
+          "Slot 1",
+          "Slot 2",
+          "Slot 3",
+          "Slot 4",
+          "Slot 5",
+          "Slot 6",
+          "Slot 7",
+          "Slot 8",
+          "Slot 9",
+          "Slot 10"
+        ],
+        "Block Reversal": [
+          "Slot 1",
+          "Slot 2",
+          "Slot 3",
+          "Slot 4",
+          "Slot 5",
+          "Slot 6",
+          "Slot 7",
+          "Slot 8",
+          "Slot 9",
+          "Slot 10"
+        ],
+        "Reversal After Damage": [
+          "Slot 1",
+          "Slot 2",
+          "Slot 3",
+          "Slot 4",
+          "Slot 5",
+          "Slot 6",
+          "Slot 7",
+          "Slot 8",
+          "Slot 9",
+          "Slot 10"
+        ]
+      }
+    },
+    "Parameter Settings": {
+      "tab_number": 6,
+      "start_position": 1,
+      "items": [
+        "Vitality Gauge P1",
+        "Vitality Gauge P2",
+        "Vitality Recovery Settings P1",
+        "Vitality Recovery Settings P2",
+        "Drive Gauge P1",
+        "Drive Gauge P2",
+        "Drive Gauge Recovery Settings P1",
+        "Drive Gauge Recovery Settings P2",
+        "SA Gauge P1",
+        "SA Gauge P2",
+        "SA Gauge Recovery Settings P1",
+        "SA Gauge Recovery Settings P2"
+      ]
+    },
+    "Screen Display Settings": {
+      "tab_number": 7,
+      "start_position": 1,
+      "items": [
+        "Attack Data",
+        "Input History Display",
+        "Frame Meter",
+        "Command Completion Display",
+        "Action Timing Display",
+        "Cancel Timing Display",
+        "Virtual Controller",
+        null,
+        "Reset Combo Damage"
+      ]
+    },
+    "Simple Training Settings": {
+      "tab_number": 8,
+      "start_position": 1,
+      "items": [
+        "Combo Practice",
+        "Anti-Air Practice",
+        "Offensive Pressure Practice",
+        "Throw Escape Practice",
+        "Standard CPU Battle",
+        "Whiff Punish Practice",
+        "Punish Practice",
+        "Drive Impact Defense Practice",
+        "The Frame Meter and You",
+        null,
+        "Save Training Settings",
+        "Load Training Settings"
+      ]
+    }
+  },
+  "submenu_tabs": {
+    "Normal Moves": {
+      "tab_number": 1,
+      "start_position": 1,
+      "items": [
+        "Light Punch",
+        "Medium Punch",
+        "Heavy Punch",
+        "Light Kick",
+        "Medium Kick",
+        "Heavy Kick",
+        "Crouching Light Punch",
+        "Crouching Medium Punch",
+        "Crouching Heavy Punch",
+        "Crouching Light Kick",
+        "Crouching Medium Kick",
+        "Crouching Heavy Kick"
+      ]
+    },
+    "Unique Attacks": {
+      "tab_number": 2,
+      "start_position": 1,
+      "items": []
+    },
+    "Special Moves": {
+      "tab_number": 3,
+      "start_position": 1,
+      "items": []
+    },
+    "Super Arts": {
+      "tab_number": 4,
+      "start_position": 1,
+      "items": []
+    },
+    "Record": {
+      "tab_number": 5,
+      "start_position": 1,
+      "items": [
+        "Slot 1",
+        "Slot 2",
+        "Slot 3",
+        "Slot 4",
+        "Slot 5",
+        "Slot 6",
+        "Slot 7",
+        "Slot 8"
+      ]
+    },
+    "Common Actions": {
+      "tab_number": 6,
+      "start_position": 1,
+      "items": [
+        "Do Nothing",
+        "Forward",
+        "Backward",
+        "Forward Dash",
+        "Back Dash",
+        "Vertical Jump",
+        "Forward Jump",
+        "Backward Jump",
+        "Normal Throw",
+        "Drive Parry",
+        "Drive Impact"
+      ]
+    }
+  },
+  "audio": {
+    "folder": "media/menu",
+    "naming_convention": "lowercase_with_underscores",
+    "extension": ".wav"
+  }
+}
