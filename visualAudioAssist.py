@@ -40,6 +40,8 @@ MATCH_CHECK_INTERVAL = 2
 HEALTH_CHECK_INTERVAL = 0.3
 HEALTH_CONFIRMATION_CHECKS = 3
 HEALTH_CONFIRMATION_DELAY = 0.1
+MENU_CONFIRMATION_CHECKS = 2
+MENU_CONFIRMATION_DELAY = 0.2
 
 CONTROL_REGIONS = [
     {"top": 834, "left": 56, "width": 35, "height": 31, "side": "left"},
@@ -958,12 +960,23 @@ def main():
                     menu_open, similarity = compare_images_grayscale(screen_img, training_menu_reference_img, training_menu_config["detection_settings"]["menu_match_threshold"])
                     
                     if menu_open:
-                        print(f"\n{'='*60}")
-                        print(f"TRAINING MENU DETECTED (similarity: {similarity*100:.1f}%)")
-                        print(f"{'='*60}\n")
-                        menu_initial_check_done = True
-                        menu_was_open = True
-                        current_mode = "training_menu"
+                        confirmed = True
+                        for i in range(MENU_CONFIRMATION_CHECKS - 1):
+                            time.sleep(MENU_CONFIRMATION_DELAY)
+                            screen_img_confirm = capture_region(tab_region)
+                            menu_still_open, similarity_confirm = compare_images_grayscale(screen_img_confirm, training_menu_reference_img, training_menu_config["detection_settings"]["menu_match_threshold"])
+                            if not menu_still_open:
+                                confirmed = False
+                                print(f"False positive filtered - menu closed during confirmation check {i+1}")
+                                break
+                        
+                        if confirmed:
+                            print(f"\n{'='*60}")
+                            print(f"TRAINING MENU DETECTED (similarity: {similarity*100:.1f}%)")
+                            print(f"{'='*60}\n")
+                            menu_initial_check_done = True
+                            menu_was_open = True
+                            current_mode = "training_menu"
                 else:
                     should_check_submenu = (menu_last_active_tab == "Reversal Settings" or menu_in_submenu)
                     
