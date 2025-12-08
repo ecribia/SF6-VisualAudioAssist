@@ -120,7 +120,6 @@ jobs:
             
             ### Installation:
             1. Download the appropriate file for your OS and preference
-            2. Ensure `training_menu_config.json` is in the same directory as the executable
-            3. Run the executable
+            2. Run the executable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
