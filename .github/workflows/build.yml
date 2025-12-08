@@ -37,7 +37,10 @@ jobs:
       
       - name: Build Linux executable
         run: |
-          pyinstaller --onefile visualAudioAssist.py --add-data "media:media" --name visualAudioAssist-${{ matrix.variant }}
+          pyinstaller --onefile visualAudioAssist.py \
+            --add-data "media:media" \
+            --add-data "training_menu_config.json:." \
+            --name visualAudioAssist-${{ matrix.variant }}
       
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
@@ -70,7 +73,7 @@ jobs:
       
       - name: Build Windows executable
         run: |
-          pyinstaller --onefile visualAudioAssist.py --add-data "media;media" --name visualAudioAssist-${{ matrix.variant }}
+          pyinstaller --onefile visualAudioAssist.py --add-data "media;media" --add-data "training_menu_config.json;." --name visualAudioAssist-${{ matrix.variant }}
       
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -103,9 +106,11 @@ jobs:
             - VS screen rank announcer
             - Critical health warnings (< 25%)
             - Automatic match detection
+            - Training menu navigation assistant
             
             **Basic Version** (rank announcer only):
             - VS screen rank announcer only
+            - Training menu navigation assistant
             
             ### Downloads:
             - **Windows Full**: `visualAudioAssist-full.exe`
@@ -115,6 +120,7 @@ jobs:
             
             ### Installation:
             1. Download the appropriate file for your OS and preference
-            2. Run the executable
+            2. Ensure `training_menu_config.json` is in the same directory as the executable
+            3. Run the executable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
