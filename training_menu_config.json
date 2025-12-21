@@ -1,7 +1,7 @@
 {
   "detection_settings": {
     "menu_check_interval": 1.0,
-    "menu_match_threshold": 0.96,
+    "menu_match_threshold": 0.97,
     "binary_threshold": 230,
     "white_pixel_threshold": 200,
     "submenu_match_threshold": 0.92
