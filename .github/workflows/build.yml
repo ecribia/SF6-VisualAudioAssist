@@ -40,13 +40,13 @@ jobs:
           pyinstaller --onefile visualAudioAssist.py \
             --add-data "media:media" \
             --add-data "training_menu_config.json:." \
-            --name visualAudioAssist-${{ matrix.variant }}
+            --name visualAudioAssist-linux-${{ matrix.variant }}
       
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
           name: visualAudioAssist-linux-${{ matrix.variant }}
-          path: dist/visualAudioAssist-${{ matrix.variant }}
+          path: dist/visualAudioAssist-linux-${{ matrix.variant }}
 
   build-windows:
     strategy:
@@ -73,13 +73,13 @@ jobs:
       
       - name: Build Windows executable
         run: |
-          pyinstaller --onefile visualAudioAssist.py --add-data "media;media" --add-data "training_menu_config.json;." --name visualAudioAssist-${{ matrix.variant }}
+          pyinstaller --onefile visualAudioAssist.py --add-data "media;media" --add-data "training_menu_config.json;." --name visualAudioAssist-win-${{ matrix.variant }}
       
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: visualAudioAssist-windows-${{ matrix.variant }}
-          path: dist/visualAudioAssist-${{ matrix.variant }}.exe
+          path: dist/visualAudioAssist-win-${{ matrix.variant }}.exe
 
   create-release:
     needs: [build-linux, build-windows]
@@ -93,10 +93,10 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            visualAudioAssist-linux-full/visualAudioAssist-full
-            visualAudioAssist-linux-basic/visualAudioAssist-basic
-            visualAudioAssist-windows-full/visualAudioAssist-full.exe
-            visualAudioAssist-windows-basic/visualAudioAssist-basic.exe
+            visualAudioAssist-linux-full/visualAudioAssist-linux-full
+            visualAudioAssist-linux-basic/visualAudioAssist-linux-basic
+            visualAudioAssist-windows-full/visualAudioAssist-win-full.exe
+            visualAudioAssist-windows-basic/visualAudioAssist-win-basic.exe
           body: |
             ## Visual Audio Assist - Street Fighter 6 Rank Announcer
             
@@ -113,10 +113,10 @@ jobs:
             - Training menu navigation assistant
             
             ### Downloads:
-            - **Windows Full**: `visualAudioAssist-full.exe`
-            - **Windows Basic**: `visualAudioAssist-basic.exe`
-            - **Linux Full**: `visualAudioAssist-full`
-            - **Linux Basic**: `visualAudioAssist-basic`
+            - **Windows Full**: `visualAudioAssist-win-full.exe`
+            - **Windows Basic**: `visualAudioAssist-win-basic.exe`
+            - **Linux Full**: `visualAudioAssist-linux-full`
+            - **Linux Basic**: `visualAudioAssist-linux-basic`
             
             ### Installation:
             1. Download the appropriate file for your OS and preference

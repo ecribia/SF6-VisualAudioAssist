@@ -423,29 +423,41 @@ def name_capture_wizard(control_images):
         try:
             left_region = CONTROL_REGIONS[0]
             screen_img = capture_region(left_region)
+            
+            best_control = None
+            best_similarity = 0
             for control_name, control_img in control_images.items():
                 similarity = compare_images_no_threshold(screen_img, control_img)
-                if similarity >= CONTROL_SIMILARITY_THRESHOLD:
-                    print("VS screen detected!")
-                    print("Waiting 1 second to avoid screen blink...")
-                    time.sleep(1)
-                    screen_img = capture_region(left_region)
-                    similarity = compare_images(screen_img, control_img)
-                    if similarity >= CONTROL_SIMILARITY_THRESHOLD:
-                        print("VS screen still present. Capturing player name from left side...")
-                        name_region = NAME_REGIONS[0]
-                        name_img = capture_region(name_region)
-                        if save_player_name_image(name_img, "left"):
-                            print("Left side name captured successfully!\n")
-                            play_audio("wizard_left_success.ogg")
-                            left_captured = True
-                            break
-                        else:
-                            print("Failed to save left side image.\n")
-                            play_audio("wizard_error.ogg")
-                            return False
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_control = control_name
+            
+            if best_similarity >= CONTROL_SIMILARITY_THRESHOLD:
+                print("VS screen detected!")
+                print("Waiting 1 second to avoid screen blink...")
+                time.sleep(1)
+                
+                screen_img = capture_region(left_region)
+                recheck_best_similarity = 0
+                for control_name, control_img in control_images.items():
+                    similarity = compare_images_no_threshold(screen_img, control_img)
+                    if similarity > recheck_best_similarity:
+                        recheck_best_similarity = similarity
+                
+                if recheck_best_similarity >= CONTROL_SIMILARITY_THRESHOLD:
+                    print("VS screen still present. Capturing player name from left side...")
+                    name_region = NAME_REGIONS[0]
+                    name_img = capture_region(name_region)
+                    if save_player_name_image(name_img, "left"):
+                        print("Left side name captured successfully!\n")
+                        play_audio("wizard_left_success.ogg")
+                        left_captured = True
                     else:
-                        print("VS screen disappeared, retrying...\n")
+                        print("Failed to save left side image.\n")
+                        play_audio("wizard_error.ogg")
+                        return False
+                else:
+                    print("VS screen disappeared, retrying...\n")
         except Exception as e:
             print(f"Error during left side capture: {e}")
             play_audio("wizard_error.ogg")
@@ -464,32 +476,45 @@ def name_capture_wizard(control_images):
         try:
             right_region = CONTROL_REGIONS[1]
             screen_img = capture_region(right_region)
+            
+            best_control = None
+            best_similarity = 0
             for control_name, control_img in control_images.items():
                 similarity = compare_images_no_threshold(screen_img, control_img)
-                if similarity >= CONTROL_SIMILARITY_THRESHOLD:
-                    print("VS screen detected!")
-                    print("Waiting 1 second to avoid screen blink...")
-                    time.sleep(1)
-                    screen_img = capture_region(right_region)
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_control = control_name
+            
+            if best_similarity >= CONTROL_SIMILARITY_THRESHOLD:
+                print("VS screen detected!")
+                print("Waiting 1 second to avoid screen blink...")
+                time.sleep(1)
+                
+                screen_img = capture_region(right_region)
+                recheck_best_similarity = 0
+                for control_name, control_img in control_images.items():
                     similarity = compare_images_no_threshold(screen_img, control_img)
-                    if similarity >= CONTROL_SIMILARITY_THRESHOLD:
-                        print("VS screen still present. Capturing player name from right side...")
-                        name_region = NAME_REGIONS[1]
-                        name_img = capture_region(name_region)
-                        if save_player_name_image(name_img, "right"):
-                            print("Right side name captured successfully!\n")
-                            play_audio("wizard_right_success.ogg")
-                            print("="*60)
-                            print("SETUP COMPLETE")
-                            print("="*60)
-                            play_audio("wizard_complete.ogg")
-                            return True
-                        else:
-                            print("Failed to save right side image.\n")
-                            play_audio("wizard_error.ogg")
-                            return False
+                    if similarity > recheck_best_similarity:
+                        recheck_best_similarity = similarity
+                
+                if recheck_best_similarity >= CONTROL_SIMILARITY_THRESHOLD:
+                    print("VS screen still present. Capturing player name from right side...")
+                    name_region = NAME_REGIONS[1]
+                    name_img = capture_region(name_region)
+                    if save_player_name_image(name_img, "right"):
+                        print("Right side name captured successfully!\n")
+                        play_audio("wizard_right_success.ogg")
+                        print("="*60)
+                        print("SETUP COMPLETE")
+                        print("="*60)
+                        play_audio("wizard_complete.ogg")
+                        return True
                     else:
-                        print("VS screen disappeared, retrying...\n")
+                        print("Failed to save right side image.\n")
+                        play_audio("wizard_error.ogg")
+                        return False
+                else:
+                    print("VS screen disappeared, retrying...\n")
         except Exception as e:
             print(f"Error during right side capture: {e}")
             play_audio("wizard_error.ogg")
@@ -788,18 +813,23 @@ def main():
                 right_region = CONTROL_REGIONS[1]
                 left_control = None
                 left_similarity = 0
-                
+
                 try:
                     screen_img = capture_region(left_region)
+                    best_control = None
+                    best_similarity = 0
                     for control_name, control_img in control_images.items():
                         similarity = compare_images_no_threshold(screen_img, control_img)
-                        if similarity >= CONTROL_SIMILARITY_THRESHOLD:
-                            left_control = control_name
-                            left_similarity = similarity
-                            break
+                        if similarity > best_similarity:
+                            best_similarity = similarity
+                            best_control = control_name
+                    
+                    if best_similarity >= CONTROL_SIMILARITY_THRESHOLD:
+                        left_control = best_control
+                        left_similarity = best_similarity
                 except Exception as e:
                     print(f"Error checking left control region: {e}")
-                
+
                 if left_control:
                     current_mode = "vs_screen"
                     right_control = None
@@ -807,12 +837,17 @@ def main():
                     
                     try:
                         screen_img = capture_region(right_region)
+                        best_control = None
+                        best_similarity = 0
                         for control_name, control_img in control_images.items():
-                            similarity = compare_images(screen_img, control_img)
-                            if similarity >= CONTROL_SIMILARITY_THRESHOLD:
-                                right_control = control_name
-                                right_similarity = similarity
-                                break
+                            similarity = compare_images_no_threshold(screen_img, control_img)
+                            if similarity > best_similarity:
+                                best_similarity = similarity
+                                best_control = control_name
+                        
+                        if best_similarity >= CONTROL_SIMILARITY_THRESHOLD:
+                            right_control = best_control
+                            right_similarity = best_similarity
                     except Exception as e:
                         print(f"Error checking right control region: {e}")
                     
@@ -833,12 +868,13 @@ def main():
                             
                             try:
                                 left_screen_img = capture_region(left_region)
-                                left_still_present = False
+                                best_similarity = 0
                                 for control_name, control_img in control_images.items():
                                     similarity = compare_images_no_threshold(left_screen_img, control_img)
-                                    if similarity >= CONTROL_SIMILARITY_THRESHOLD:
-                                        left_still_present = True
-                                        break
+                                    if similarity > best_similarity:
+                                        best_similarity = similarity
+                                
+                                left_still_present = best_similarity >= CONTROL_SIMILARITY_THRESHOLD
                                 
                                 if not left_still_present:
                                     print("VS screen disappeared during wait, skipping...")
@@ -849,7 +885,7 @@ def main():
                                 print(f"Error re-verifying left control region: {e}")
                                 time.sleep(CHECK_INTERVAL)
                                 continue
-                            
+
                             opponent_side = None
                             opponent_control = None
                             
