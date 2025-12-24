@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from config import NAME_THRESHOLD
+from config import NAME_THRESHOLD, CHARACTER_THRESHOLD
 
 def load_image_from_path(image_path):
     if not image_path.exists():
@@ -52,6 +52,23 @@ def compare_names(img1, img2):
     _, binary2 = cv2.threshold(gray2, NAME_THRESHOLD, 255, cv2.THRESH_BINARY)
     
     mse = np.mean((img1.astype(float) - binary2.astype(float)) ** 2)
+    max_mse = 255 ** 2
+    similarity = 1 - (mse / max_mse)
+    return similarity
+
+def compare_characters(img1, img2):
+    """Compare character images using binary threshold at 215"""
+    if img1.shape != img2.shape:
+        img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
+    
+    # Convert both to grayscale and apply same threshold
+    gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+    gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+    
+    _, binary1 = cv2.threshold(gray1, CHARACTER_THRESHOLD, 255, cv2.THRESH_BINARY)
+    _, binary2 = cv2.threshold(gray2, CHARACTER_THRESHOLD, 255, cv2.THRESH_BINARY)
+    
+    mse = np.mean((binary1.astype(float) - binary2.astype(float)) ** 2)
     max_mse = 255 ** 2
     similarity = 1 - (mse / max_mse)
     return similarity

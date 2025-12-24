@@ -35,8 +35,10 @@ MATCH_END_CONFIRMATION_DELAY = 2
 CONTROL_SIMILARITY_THRESHOLD = 0.98
 MIN_RANK_THRESHOLD = 0.80
 MIN_DIVISION_THRESHOLD = 0.83
-MIN_MR_THRESHOLD = 0.93
+MIN_MR_THRESHOLD = 0.90
+MIN_CHARACTER_THRESHOLD = 0.85
 NAME_THRESHOLD = 190
+CHARACTER_THRESHOLD = 210
 
 CONTROL_REGIONS = [
     {"top": 834, "left": 56, "width": 35, "height": 31, "side": "left"},
@@ -71,6 +73,11 @@ HEALTH_REGIONS = [
 MR_REGIONS = [
     {"top": 993, "left": 38, "width": 14, "height": 23, "side": "left"},
     {"top": 993, "left": 1713, "width": 14, "height": 23, "side": "right"}
+]
+
+CHARACTER_REGIONS = [
+    {"top": 823, "left": 112, "width": 134, "height": 42, "side": "left"},
+    {"top": 823, "left": 1674, "width": 134, "height": 42, "side": "right"}
 ]
 
 RANKS = [

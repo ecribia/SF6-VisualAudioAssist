@@ -1,10 +1,11 @@
 import time
 import platform
+import config
 
 from config import (
     MEDIA_FOLDER, ENABLE_HEALTH_MONITORING, ENABLE_TRAINING_MENU,
     CHECK_INTERVAL, COOLDOWN_PERIOD, CONTROLS, RANKS, DIVISIONS, MR_VALUES,
-    load_training_menu_config, training_menu_config, get_exe_directory
+    load_training_menu_config, get_exe_directory
 )
 from image_processing import load_image, load_image_from_path
 from vs_screen import handle_vs_screen_detection
@@ -44,6 +45,36 @@ def load_game_images():
     
     return control_images, rank_images, division_images, mr_images
 
+def load_character_images():
+    print("Loading character images...")
+    character_images = {"left": {}, "right": {}}
+    
+    left_dir = MEDIA_FOLDER / "characters" / "left"
+    right_dir = MEDIA_FOLDER / "characters" / "right"
+    
+    if not left_dir.exists() or not right_dir.exists():
+        print("Warning: Character directories not found. Character detection disabled.\n")
+        return character_images
+    
+    for img_path in left_dir.glob("*.png"):
+        char_name = img_path.stem
+        try:
+            character_images["left"][char_name] = load_image(img_path)
+        except Exception as e:
+            print(f"Warning: Could not load {img_path}: {e}")
+    
+    for img_path in right_dir.glob("*.png"):
+        char_name = img_path.stem
+        try:
+            character_images["right"][char_name] = load_image(img_path)
+        except Exception as e:
+            print(f"Warning: Could not load {img_path}: {e}")
+    
+    print(f"Loaded {len(character_images['left'])} left-side character images")
+    print(f"Loaded {len(character_images['right'])} right-side character images\n")
+    
+    return character_images
+
 def setup_training_menu():
     if not ENABLE_TRAINING_MENU:
         return False, None, None
@@ -51,12 +82,16 @@ def setup_training_menu():
     if not load_training_menu_config():
         return False, None, None
     
+    if config.training_menu_config is None:
+        print("Training menu config is None after loading")
+        return False, None, None
+    
     try:
         menu_ref_img = load_image(
-            MEDIA_FOLDER / training_menu_config["tab_detection"]["reference_image"]
+            MEDIA_FOLDER / config.training_menu_config["tab_detection"]["reference_image"]
         )
         submenu_ref_img = load_image(
-            MEDIA_FOLDER / training_menu_config["submenu_detection"]["reference_image"]
+            MEDIA_FOLDER / config.training_menu_config["submenu_detection"]["reference_image"]
         )
         print("Training menu monitoring enabled\n")
         return True, menu_ref_img, submenu_ref_img
@@ -72,6 +107,7 @@ def main():
     
     try:
         control_images, rank_images, division_images, mr_images = load_game_images()
+        character_images = load_character_images()
     except Exception as e:
         print(f"Error loading images: {e}")
         return
@@ -94,6 +130,8 @@ def main():
         print(f"Health monitoring: Enabled")
     if training_menu_enabled:
         print(f"Training menu: Enabled")
+    if character_images["left"] or character_images["right"]:
+        print(f"Character detection: Enabled")
     print("Press Ctrl+C to stop\n")
     
     last_audio_time = 0
@@ -130,35 +168,40 @@ def main():
                 new_mode = handle_health_monitoring(current_time, health_state)
                 if new_mode:
                     current_mode = new_mode
-                    # If match just ended, immediately check for VS screen
                     if new_mode == 'idle':
                         vs_detected, vs_mode, last_audio_time = handle_vs_screen_detection(
                             current_time, last_audio_time, control_images, player_name_img,
-                            rank_images, division_images, mr_images
+                            rank_images, division_images, mr_images, character_images
                         )
                         if vs_detected:
                             current_mode = 'vs_screen'
-            
-            # Only check VS screen when health monitoring is NOT active
-            # Use elif to avoid double-checking in same iteration
-            elif not health_state['active'] and current_mode in ["vs_screen", "idle"]:
-                vs_detected, new_mode, last_audio_time = handle_vs_screen_detection(
-                    current_time, last_audio_time, control_images, player_name_img,
-                    rank_images, division_images, mr_images
-                )
                 
-                if vs_detected:
-                    current_mode = 'vs_screen'
-                    if ENABLE_HEALTH_MONITORING:
-                        health_state['active'] = False
-                        health_state['alert_states']["left"]["alert_played"] = False
-                        health_state['alert_states']["right"]["alert_played"] = False
-                elif current_mode == "vs_screen":
-                    current_mode = "idle"
+                if not health_state['active'] and current_mode in ["vs_screen", "idle"]:
+                    vs_detected, new_mode, last_audio_time = handle_vs_screen_detection(
+                        current_time, last_audio_time, control_images, player_name_img,
+                        rank_images, division_images, mr_images, character_images
+                    )
+                    
+                    if vs_detected:
+                        current_mode = 'vs_screen'
+                    elif current_mode == "vs_screen":
+                        current_mode = "idle"
+            
+            else:
+                if current_mode in ["vs_screen", "idle"]:
+                    vs_detected, new_mode, last_audio_time = handle_vs_screen_detection(
+                        current_time, last_audio_time, control_images, player_name_img,
+                        rank_images, division_images, mr_images, character_images
+                    )
+                    
+                    if vs_detected:
+                        current_mode = 'vs_screen'
+                    elif current_mode == "vs_screen":
+                        current_mode = "idle"
             
             if training_menu_enabled and current_mode in ["training_menu", "idle"]:
                 menu_open = handle_training_menu(
-                    menu_state, training_menu_config, 
+                    menu_state, config.training_menu_config, 
                     menu_ref_img, submenu_ref_img
                 )
                 

@@ -1,12 +1,15 @@
 import time
 from capture import capture_region
-from image_processing import compare_images_no_threshold, compare_names, compare_images, check_control_color
+from image_processing import (
+    compare_images_no_threshold, compare_names, compare_images, 
+    compare_characters, check_control_color
+)
 from audio import play_audio_sequence
 from config import (
     CONTROL_REGIONS, CONTROL_COLOR_REGIONS, RANK_REGIONS, NAME_REGIONS,
-    DIVISION_REGIONS, MR_REGIONS, CONTROL_SIMILARITY_THRESHOLD,
-    MIN_RANK_THRESHOLD, MIN_DIVISION_THRESHOLD, MIN_MR_THRESHOLD,
-    RANKS_WITH_DIVISIONS, COOLDOWN_PERIOD, VS_SCREEN_WAIT_TIME
+    DIVISION_REGIONS, MR_REGIONS, CHARACTER_REGIONS, CONTROL_SIMILARITY_THRESHOLD,
+    MIN_RANK_THRESHOLD, MIN_DIVISION_THRESHOLD, MIN_MR_THRESHOLD, 
+    MIN_CHARACTER_THRESHOLD, RANKS_WITH_DIVISIONS, COOLDOWN_PERIOD, VS_SCREEN_WAIT_TIME
 )
 
 def find_best_rank_match(captured_img, rank_images):
@@ -45,8 +48,19 @@ def find_best_mr_match(captured_img, mr_images):
         return None, best_similarity
     return best_match, best_similarity
 
+def find_best_character_match(captured_img, character_images):
+    best_match = None
+    best_similarity = 0
+    for character_name, character_img in character_images.items():
+        similarity = compare_characters(captured_img, character_img)
+        if similarity > best_similarity:
+            best_similarity = similarity
+            best_match = character_name
+    if best_similarity < MIN_CHARACTER_THRESHOLD:
+        return None, best_similarity
+    return best_match, best_similarity
+
 def detect_control_via_image(region, control_images):
-    """Fallback method: detect control scheme via image comparison using compare_images (B&W)"""
     try:
         screen_img = capture_region(region)
         best_control = None
@@ -57,8 +71,7 @@ def detect_control_via_image(region, control_images):
                 best_similarity = similarity
                 best_control = control_name
         
-        # Use a reasonable threshold for B&W comparison
-        if best_similarity >= 0.85:  # Adjust this threshold if needed
+        if best_similarity >= 0.85:
             return best_control, best_similarity
         return None, best_similarity
     except Exception as e:
@@ -66,7 +79,7 @@ def detect_control_via_image(region, control_images):
         return None, 0.0
 
 def handle_vs_screen_detection(current_time, last_audio_time, control_images, 
-                               player_name_img, rank_images, division_images, mr_images):
+                               player_name_img, rank_images, division_images, mr_images, character_images):
     left_region = CONTROL_REGIONS[0]
     right_region = CONTROL_REGIONS[1]
     left_color_region = CONTROL_COLOR_REGIONS[0]
@@ -218,6 +231,20 @@ def handle_vs_screen_detection(current_time, last_audio_time, control_images,
             print(f"{'='*60}\n")
             return True, 'vs_screen', last_audio_time
         
+        print("\nCapturing opponent character region...")
+        opponent_character_region = CHARACTER_REGIONS[0] if opponent_side == "left" else CHARACTER_REGIONS[1]
+        
+        opponent_character = None
+        try:
+            opponent_character_img = capture_region(opponent_character_region)
+            opponent_character, char_sim = find_best_character_match(opponent_character_img, character_images[opponent_side])
+            if opponent_character:
+                print(f"Opponent character: {opponent_character} ({char_sim * 100:.1f}%)")
+            else:
+                print(f"No character match found (best: {char_sim * 100:.1f}%)")
+        except Exception as e:
+            print(f"Error capturing character: {e}")
+        
         print("\nCapturing opponent rank region...")
         opponent_rank_region = RANK_REGIONS[0] if opponent_side == "left" else RANK_REGIONS[1]
         
@@ -255,15 +282,20 @@ def handle_vs_screen_detection(current_time, last_audio_time, control_images,
                     print(f"Error capturing division: {e}, using base rank")
             
             if opponent_control:
+                audio_files = [f"{opponent_control}.ogg"]
+                
+                if opponent_character:
+                    audio_files.append(f"characters/{opponent_character}.ogg")
+                
                 if opponent_rank == "Unknown":
-                    audio_files = [f"{opponent_control}.ogg", "Unknown.ogg"]
-                    print(f"\nRank unknown, playing control + Unknown")
+                    audio_files.append("Unknown.ogg")
+                    print(f"\nRank unknown, playing control + character + Unknown")
                 elif opponent_rank == "Master" and mr_value:
-                    audio_files = [f"{opponent_control}.ogg", f"{mr_value}.ogg"]
+                    audio_files.append(f"{mr_value}.ogg")
                 elif opponent_rank in RANKS_WITH_DIVISIONS and division:
-                    audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}{division}.ogg"]
+                    audio_files.append(f"{opponent_rank}{division}.ogg")
                 else:
-                    audio_files = [f"{opponent_control}.ogg", f"{opponent_rank}.ogg"]
+                    audio_files.append(f"{opponent_rank}.ogg")
                 
                 print(f"\nPlaying audio sequence: {' -> '.join(audio_files)}")
                 play_audio_sequence(audio_files)
