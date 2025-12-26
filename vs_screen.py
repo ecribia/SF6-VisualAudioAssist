@@ -179,29 +179,28 @@ def handle_vs_screen_detection(current_time, last_audio_time, control_images,
                 print(f"  Left: All detection methods failed, defaulting to Classic")
                 left_control = "Classic"
         
-        if vs_detected_right:
-            try:
-                color_img = capture_region(right_color_region)
-                right_control = check_control_color(color_img)
-                if right_control:
-                    print(f"  Right: {right_control} [via color]")
-                else:
-                    print(f"  Right: Color detection failed, trying image comparison...")
-                    right_control, sim = detect_control_via_image(right_region, control_images)
-                    if right_control:
-                        print(f"  Right: {right_control} [via image, {sim*100:.1f}%]")
-                    else:
-                        print(f"  Right: Image detection also failed, using left side")
-                        right_control = left_control
-            except Exception as e:
-                print(f"  Right: Color detection error: {e}")
-                print(f"  Right: Trying image comparison fallback...")
+        try:
+            color_img = capture_region(right_color_region)
+            right_control = check_control_color(color_img)
+            if right_control:
+                print(f"  Right: {right_control} [via color]")
+            else:
+                print(f"  Right: Color detection failed, trying image comparison...")
                 right_control, sim = detect_control_via_image(right_region, control_images)
                 if right_control:
                     print(f"  Right: {right_control} [via image, {sim*100:.1f}%]")
                 else:
-                    print(f"  Right: All detection methods failed, using left side")
+                    print(f"  Right: Image detection also failed, using left side")
                     right_control = left_control
+        except Exception as e:
+            print(f"  Right: Color detection error: {e}")
+            print(f"  Right: Trying image comparison fallback...")
+            right_control, sim = detect_control_via_image(right_region, control_images)
+            if right_control:
+                print(f"  Right: {right_control} [via image, {sim*100:.1f}%]")
+            else:
+                print(f"  Right: All detection methods failed, using left side")
+                right_control = left_control
         
         print("\nUsing name detection...")
         opponent_side = None
@@ -218,7 +217,7 @@ def handle_vs_screen_detection(current_time, last_audio_time, control_images,
             
             if left_name_similarity > right_name_similarity:
                 opponent_side = "right"
-                opponent_control = right_control if right_control else left_control
+                opponent_control = right_control
                 print(f"Player detected on LEFT, opponent on RIGHT")
                 print(f"Opponent control: {opponent_control}")
             else:
