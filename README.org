@@ -1,44 +1,38 @@
-* What is this?
+* Visual Audio Assist for Street Fighter 6
 
-Visual Audio Assist is an accessibility tool for Street Fighter 6 that announces your opponent's rank and control type (Classic/Modern) with audio cues during the VS screen. It also monitors health bars and alerts you when either player reaches critical health.
+An accessibility tool that reads out your opponent's info and monitors health during matches.
 
-* Features
+* What it does
 
-- Announces opponent's rank (e.g., "Classic Gold 3", "Modern Diamond 4")
-- Announces Master rank players with their MR rating (1000-1500)
-- Critical health alerts during matches
-- Audio-guided setup wizard
+- Reads your opponent's control type (Classic/Modern) and rank when the VS screen appears
+- Works with all ranks including Master players with MR ratings
+- Alerts you when either player hits critical health (yellow bar)
+- Can announce training menu options as you navigate them
 
-* Installation
+* Requirements
 
-** Requirements
-- Street Fighter 6 running at 1920x1080 resolution
+*IMPORTANT:* You need to run SF6 in fullscreen at 1920x1080 resolution. The program won't work correctly at other resolutions.
 
-** Setup
-1. Download the appropriate version under 'Releases'
-2. Run the program - it will automatically start the **Name Capture Wizard**
-3. Follow the audio instructions:
-   - Open a replay where you're on the LEFT side
-   - Wait for the VS screen
-   - The wizard captures your name automatically
-   - Open a replay where you're on the RIGHT side
-   - Wait for the VS screen again
-   - Setup complete!
+* Setup
 
-The wizard has full audio guidance to walk you through each step.
+1. Download the release for your OS (Windows/Linux)
+2. Run the program
+3. When the name capture wizard starts, just follow along:
+   - Open any replay where you're on the LEFT side
+   - Wait for the VS screen to show up
+   - That's it - your name gets saved automatically
+4. Done! The program will now work during actual matches
 
-* Versions
+The wizard has audio that walks you through everything.
 
-** Basic Version
-- Announces rank and control type only
-- Lightweight and simple
+* How to use
 
-** Full Version
-- Everything in Basic
-- Critical health monitoring with audio alerts
-- Match start/end detection
+Just leave it running in the background while you play. When a match loads and the VS screen appears, you'll hear your opponent's info. During the match, if either player gets to critical health, you'll get an alert in the corresponding ear (left player = left audio channel, right player = right audio channel).
+
+* If something goes wrong
+
+If name detection seems off, delete MyName.png and run the program again to redo the capture wizard.
 
 * Notes
 
-- The program is very accurate but occasional detection errors may occur due to unusual lighting conditions and/or certain backgrounds
-- If detection seems off, you can re-run the Name Capture Wizard by deleting MyNameLeft.png and MyNameRight.png, created by the wizard.
+Detection is pretty accurate but might occasionally mess up with weird stage lighting or backgrounds. This is just how image recognition goes sometimes.
