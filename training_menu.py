@@ -327,13 +327,15 @@ def handle_training_menu(menu_state, config, menu_reference_img, submenu_referen
             
             audio_file = item_name_to_audio_file(selected_item, config)
             print(f"Playing: {audio_file}")
-            play_audio(audio_file, "menu", allow_interrupt=False)
+            # Play item name WITH allow_interrupt so parent items can cut each other off
+            play_audio(audio_file, "menu", allow_interrupt=True)
             
             menu_state['last_selected_item'] = selected_item
             menu_state['last_item_position'] = item_position
             menu_state['last_announced_option'] = None
             print(f"Locked onto '{selected_item}' - waiting for deselection\n")
     else:
+        # Item is still selected, continuously check for option value changes
         current_option = detect_option_value(
             menu_state['last_selected_item'], 
             tab_name, 
@@ -343,9 +345,17 @@ def handle_training_menu(menu_state, config, menu_reference_img, submenu_referen
         )
         
         if current_option:
+            # Get a unique identifier for this option (using the audio filename)
             current_option_id = current_option.get("audio", "")
             
+            # If this is different from the last announced option, announce it
             if menu_state['last_announced_option'] != current_option_id:
+                # Wait for any currently playing audio to finish (parent item name)
+                from pygame import mixer
+                while mixer.music.get_busy():
+                    import time
+                    time.sleep(0.05)
+                
                 print(f"Option value: {current_option['audio'].replace('.ogg', '')}")
                 play_audio(current_option["audio"], "menu", allow_interrupt=True)
                 menu_state['last_announced_option'] = current_option_id
