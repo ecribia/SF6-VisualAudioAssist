@@ -4,6 +4,7 @@ from capture import capture_region
 from image_processing import apply_binary_threshold, check_for_white_pixels, compare_images_grayscale
 from audio import play_audio
 from config import MENU_CONFIRMATION_CHECKS, MENU_CONFIRMATION_DELAY
+from option_detection import announce_option_value, detect_option_value
 
 def check_if_in_submenu(config, submenu_reference_img):
     indicator_region = {"top": 35, "left": 877, "width": 13, "height": 14}
@@ -222,6 +223,7 @@ def handle_training_menu(menu_state, config, menu_reference_img, submenu_referen
                 menu_state['last_item_position'] = None
                 menu_state['last_active_tab'] = None
                 menu_state['last_active_sub_tab'] = None
+                menu_state['last_announced_option'] = None
             else:
                 print(f"\n{'-'*60}")
                 print("RETURNED TO MAIN MENU")
@@ -230,6 +232,7 @@ def handle_training_menu(menu_state, config, menu_reference_img, submenu_referen
                 menu_state['last_item_position'] = None
                 menu_state['last_active_tab'] = "Reversal Settings"
                 menu_state['sub_tab_announced'] = False
+                menu_state['last_announced_option'] = None
     else:
         menu_state['in_submenu'] = False
     
@@ -248,6 +251,7 @@ def handle_training_menu(menu_state, config, menu_reference_img, submenu_referen
             menu_state['last_active_sub_tab'] = None
             menu_state['sub_tab_announced'] = False
             menu_state['in_submenu'] = False
+            menu_state['last_announced_option'] = None
         return False
     
     if not menu_state['was_open']:
@@ -270,6 +274,7 @@ def handle_training_menu(menu_state, config, menu_reference_img, submenu_referen
         menu_state['last_item_position'] = None
         menu_state['last_active_sub_tab'] = None
         menu_state['sub_tab_announced'] = False
+        menu_state['last_announced_option'] = None
     
     menu_state['last_active_tab'] = tab_name
     
@@ -292,6 +297,7 @@ def handle_training_menu(menu_state, config, menu_reference_img, submenu_referen
             play_audio(audio_file, "menu")
             menu_state['last_selected_item'] = None
             menu_state['last_item_position'] = None
+            menu_state['last_announced_option'] = None
         
         menu_state['last_active_sub_tab'] = sub_tab_name
     
@@ -304,6 +310,7 @@ def handle_training_menu(menu_state, config, menu_reference_img, submenu_referen
             print(f"'{menu_state['last_selected_item']}' deselected - resuming scan\n")
             menu_state['last_selected_item'] = None
             menu_state['last_item_position'] = None
+            menu_state['last_announced_option'] = None
     
     if menu_state['last_selected_item'] is None:
         selected_item, item_position = detect_selected_item(
@@ -320,10 +327,27 @@ def handle_training_menu(menu_state, config, menu_reference_img, submenu_referen
             
             audio_file = item_name_to_audio_file(selected_item, config)
             print(f"Playing: {audio_file}")
-            play_audio(audio_file, "menu", allow_interrupt=True)
+            play_audio(audio_file, "menu", allow_interrupt=False)
             
             menu_state['last_selected_item'] = selected_item
             menu_state['last_item_position'] = item_position
+            menu_state['last_announced_option'] = None
             print(f"Locked onto '{selected_item}' - waiting for deselection\n")
+    else:
+        current_option = detect_option_value(
+            menu_state['last_selected_item'], 
+            tab_name, 
+            sub_tab_name, 
+            config, 
+            menu_state['in_submenu']
+        )
+        
+        if current_option:
+            current_option_id = current_option.get("audio", "")
+            
+            if menu_state['last_announced_option'] != current_option_id:
+                print(f"Option value: {current_option['audio'].replace('.ogg', '')}")
+                play_audio(current_option["audio"], "menu", allow_interrupt=True)
+                menu_state['last_announced_option'] = current_option_id
     
     return True

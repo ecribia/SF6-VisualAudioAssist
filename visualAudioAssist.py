@@ -157,7 +157,8 @@ def main():
         'was_open': False,
         'initial_check_done': False,
         'sub_tab_announced': False,
-        'in_submenu': False
+        'in_submenu': False,
+        'last_announced_option': None
     }
     
     try:
