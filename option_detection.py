@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 from capture import capture_region
 from audio import play_audio
 
@@ -73,7 +74,9 @@ def detect_option_value(item_name, tab_name, sub_tab_name, config, is_submenu=Fa
         tolerance = config["detection_settings"]["yellow_width_tolerance"]
         return detect_by_yellow_width(region, option_config, option_definitions, tolerance)
     elif option_config["detection_method"] == "image_comparison":
-        return detect_by_image_comparison(region, option_config, option_definitions)
+        threshold = option_config.get("comparison_threshold", 0.85)
+        binary_threshold = option_config.get("binary_threshold", None)
+        return detect_by_image_comparison(region, option_config, option_definitions, threshold, binary_threshold)
     
     return None
 
@@ -82,7 +85,7 @@ def detect_by_yellow_width(region, option_config, option_definitions, tolerance)
     img = capture_region(region)
     
     yellow_mask = (
-        (img[:,:,0] >= 50) & (img[:,:,0] <= 120) &
+        (img[:,:,0] >= 50) & (img[:,:,0] <= 120) & 
         (img[:,:,1] >= 200) & (img[:,:,1] <= 255) &
         (img[:,:,2] >= 200) & (img[:,:,2] <= 255)
     )
@@ -121,12 +124,17 @@ def detect_by_yellow_width(region, option_config, option_definitions, tolerance)
         print(f"  [No match within tolerance, using default]")
         return option_definitions[default_key]
 
-def detect_by_image_comparison(region, option_config, option_definitions):
+def detect_by_image_comparison(region, option_config, option_definitions, threshold=0.85, binary_threshold=None):
     """Detect option by comparing against reference images"""
     from image_processing import load_image, compare_images_grayscale
     from config import MEDIA_FOLDER
     
     img = capture_region(region)
+    
+    if binary_threshold is not None:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, img = cv2.threshold(gray, binary_threshold, 255, cv2.THRESH_BINARY)
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
     
     best_match = None
     best_similarity = 0
@@ -142,7 +150,13 @@ def detect_by_image_comparison(region, option_config, option_definitions):
         
         try:
             ref_img = load_image(ref_img_path)
-            is_match, similarity = compare_images_grayscale(img, ref_img, threshold=0.85)
+            
+            if binary_threshold is not None:
+                ref_gray = cv2.cvtColor(ref_img, cv2.COLOR_BGR2GRAY)
+                _, ref_img = cv2.threshold(ref_gray, binary_threshold, 255, cv2.THRESH_BINARY)
+                ref_img = cv2.cvtColor(ref_img, cv2.COLOR_GRAY2BGR)
+            
+            is_match, similarity = compare_images_grayscale(img, ref_img, threshold=threshold)
             
             if similarity > best_similarity:
                 best_similarity = similarity
@@ -157,6 +171,7 @@ def detect_by_image_comparison(region, option_config, option_definitions):
         return best_match
     
     first_option_key = option_config["options"][0]
+    print(f"  [No good match found, using first option '{first_option_key}']")
     return option_definitions[first_option_key]
 
 def announce_option_value(item_name, tab_name, sub_tab_name, config, is_submenu=False):
